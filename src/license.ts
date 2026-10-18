@@ -137,6 +137,23 @@ export function isTeam(): boolean {
   }
 }
 
+export function getLicenseKey(): string | null {
+  const licensePath = getLicensePath();
+  if (!fs.existsSync(licensePath)) return null;
+
+  try {
+    const stored: StoredLicense = JSON.parse(fs.readFileSync(licensePath, "utf8"));
+    const info = verifyLicenseKey(stored.key);
+    if (!info) {
+      fs.unlinkSync(licensePath);
+      return null;
+    }
+    return stored.key;
+  } catch {
+    return null;
+  }
+}
+
 export function getLicenseInfo(): LicenseInfo | null {
   const licensePath = getLicensePath();
   if (!fs.existsSync(licensePath)) return null;

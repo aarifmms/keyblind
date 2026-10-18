@@ -39,13 +39,20 @@ function ConnectForm() {
 
         const data = await res.json();
 
-        const loginRes = await fetch("/api/auth/pair", {
+        if (!data.licenseKey) {
+          throw new Error("No license activated. Run 'keyblind activate <key>' first.");
+        }
+
+        const loginRes = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tier: data.tier, email: data.email }),
+          body: JSON.stringify({ licenseKey: data.licenseKey }),
         });
 
-        if (!loginRes.ok) throw new Error("Session creation failed");
+        if (!loginRes.ok) {
+          const loginData = await loginRes.json().catch(() => ({}));
+          throw new Error(loginData.error || "Session creation failed");
+        }
 
         if (!cancelled) {
           setStatus("success");
