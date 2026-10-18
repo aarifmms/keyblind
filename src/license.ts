@@ -6,8 +6,12 @@ import os from "node:os";
 // Ed25519 public keys accepted for license verification, in priority order.
 // Rotate the signing key without breaking existing licenses by appending the new
 // public key via KEYBLIND_PUBLIC_KEYS (JSON array or comma-separated) or
-// KEYBLIND_PUBLIC_KEY. The baked fallback is always tried last.
-const FALLBACK_PUBLIC_KEY = "MCowBQYDK2VwAyEAaxu7ncsxw3rW0Sycd9iIVu4prMKbsjN9hZghJYI2LoY=";
+// KEYBLIND_PUBLIC_KEY. The baked fallback keys are always tried last.
+const FALLBACK_PUBLIC_KEYS = [
+  "MCowBQYDK2VwAyEAaxu7ncsxw3rW0Sycd9iIVu4prMKbsjN9hZghJYI2LoY=",
+  // gmail re-issue key (lic_fd7a064f5d18d2bc, aarifmms@gmail.com)
+  "MCowBQYDK2VwAyEAnZz1qlGZu/oXSVo19765RijwLBaR7ajFiYW07K15ORQ=",
+];
 
 function getPublicKeys(): string[] {
   const keys: string[] = [];
@@ -24,7 +28,7 @@ function getPublicKeys(): string[] {
   }
 
   if (process.env.KEYBLIND_PUBLIC_KEY) keys.push(process.env.KEYBLIND_PUBLIC_KEY);
-  keys.push(FALLBACK_PUBLIC_KEY);
+  keys.push(...FALLBACK_PUBLIC_KEYS);
 
   return keys.filter(Boolean).map((k) => k.trim());
 }
