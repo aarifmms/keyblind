@@ -1,0 +1,10 @@
+Encrypted secrets vault for AI agents. Store API keys, tokens, and passwords in an AES-256-GCM-encrypted vault and let your agent resolve them at runtime over MCP - the plaintext value never appears in the conversation transcript.
+
+The problem: 100,000+ LLM conversations with exposed secrets were found indexed by search engines. AI agents read your .env files, copy-paste secrets into chat, and commit them accidentally.
+
+Keyblind keeps secrets encrypted at rest and resolves them just-in-time through the MCP protocol, so the agent gets the value when it needs it without ever "seeing" it.
+
+- Works with every MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed
+- 16 tools - secrets CRUD, TOTP 2FA, encrypted sharing, dead man's switch, .env sandbox, audit log
+- One-command setup: npm i -g keyblind && keyblind setup-mcp
+- Free: 5 secrets. Pro: unlimited ($79/yr) at keyblind.dev
