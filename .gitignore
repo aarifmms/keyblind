@@ -6,4 +6,6 @@ dist
 .mcp.json
 .vercel
 .env*.local
+.env.test
 .next
+keyblind.mcpb

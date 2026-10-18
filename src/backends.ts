@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { resolveSecret, listSecrets, storeSecret } from "./vault.js";
 
 function hasCommand(cmd: string): boolean {
@@ -37,7 +37,7 @@ function create1PasswordBackend(): SecretBackend {
     name: "1password",
     resolve: (name) => {
       try {
-        const result = execSync(`op read "op://${name}"`, {
+        const result = execFileSync("op", ["read", `op://${name}`], {
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "ignore"],
         });
@@ -48,7 +48,7 @@ function create1PasswordBackend(): SecretBackend {
     },
     list: () => {
       try {
-        const result = execSync("op item list --format json", {
+        const result = execFileSync("op", ["item", "list", "--format", "json"], {
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "ignore"],
         });
@@ -59,7 +59,7 @@ function create1PasswordBackend(): SecretBackend {
       }
     },
     store: (name, value) => {
-      execSync(`op item create --category login --title "${name}" --password "${value}"`, {
+      execFileSync("op", ["item", "create", "--category", "login", "--title", name, "--password", value], {
         stdio: "ignore",
       });
     },
@@ -74,7 +74,7 @@ function createBitwardenBackend(): SecretBackend {
     name: "bitwarden",
     resolve: (name) => {
       try {
-        const result = execSync(`bw get password "${name}"`, {
+        const result = execFileSync("bw", ["get", "password", name], {
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "ignore"],
         });
@@ -85,7 +85,7 @@ function createBitwardenBackend(): SecretBackend {
     },
     list: () => {
       try {
-        const result = execSync('bw list items --search ""', {
+        const result = execFileSync("bw", ["list", "items", "--search", ""], {
           encoding: "utf-8",
           stdio: ["pipe", "pipe", "ignore"],
         });
@@ -123,8 +123,9 @@ function createAwsBackend(): SecretBackend {
     name: "aws",
     resolve: (name) => {
       try {
-        const result = execSync(
-          `aws secretsmanager get-secret-value --secret-id "${name}" --query SecretString --output text`,
+        const result = execFileSync(
+          "aws",
+          ["secretsmanager", "get-secret-value", "--secret-id", name, "--query", "SecretString", "--output", "text"],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim();
@@ -134,8 +135,9 @@ function createAwsBackend(): SecretBackend {
     },
     list: () => {
       try {
-        const result = execSync(
-          "aws secretsmanager list-secrets --query SecretList[].Name --output text",
+        const result = execFileSync(
+          "aws",
+          ["secretsmanager", "list-secrets", "--query", "SecretList[].Name", "--output", "text"],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim().split(/\s+/).filter(Boolean);
@@ -144,7 +146,7 @@ function createAwsBackend(): SecretBackend {
       }
     },
     store: (name, value) => {
-      execSync(`aws secretsmanager create-secret --name "${name}" --secret-string "${value}"`, {
+      execFileSync("aws", ["secretsmanager", "create-secret", "--name", name, "--secret-string", value], {
         stdio: "ignore",
       });
     },
@@ -159,8 +161,9 @@ function createGcpBackend(): SecretBackend {
     name: "gcp",
     resolve: (name) => {
       try {
-        const result = execSync(
-          `gcloud secrets versions access latest --secret="${name}"`,
+        const result = execFileSync(
+          "gcloud",
+          ["secrets", "versions", "access", "latest", `--secret=${name}`],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim();
@@ -170,8 +173,9 @@ function createGcpBackend(): SecretBackend {
     },
     list: () => {
       try {
-        const result = execSync(
-          "gcloud secrets list --format='value(name)'",
+        const result = execFileSync(
+          "gcloud",
+          ["secrets", "list", "--format=value(name)"],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim().split("\n").filter(Boolean);
@@ -180,9 +184,19 @@ function createGcpBackend(): SecretBackend {
       }
     },
     store: (name, value) => {
-      execSync(`echo "${value}" | gcloud secrets create "${name}" --data-file=- --replication-policy=automatic 2>/dev/null || echo "${value}" | gcloud secrets versions add "${name}" --data-file=-`, {
-        stdio: "ignore",
-      });
+      try {
+        execFileSync(
+          "gcloud",
+          ["secrets", "create", name, "--data-file=-", "--replication-policy=automatic"],
+          { input: value, stdio: ["pipe", "ignore", "ignore"] },
+        );
+      } catch {
+        execFileSync(
+          "gcloud",
+          ["secrets", "versions", "add", name, "--data-file=-"],
+          { input: value, stdio: ["pipe", "ignore", "ignore"] },
+        );
+      }
     },
     isAvailable: () => hasCommand("gcloud"),
   };
@@ -199,8 +213,9 @@ function createAzureBackend(): SecretBackend {
         const [vault, ...secretParts] = name.split("/");
         const secret = secretParts.join("/");
         if (!secret) return null;
-        const result = execSync(
-          `az keyvault secret show --vault-name "${vault}" --name "${secret}" --query value -o tsv`,
+        const result = execFileSync(
+          "az",
+          ["keyvault", "secret", "show", "--vault-name", vault, "--name", secret, "--query", "value", "-o", "tsv"],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim();
@@ -213,8 +228,9 @@ function createAzureBackend(): SecretBackend {
         // List requires a vault name — default to checking common env vars
         const vault = process.env.AZURE_KEY_VAULT || process.env.KEYBLIND_AZURE_VAULT;
         if (!vault) return [];
-        const result = execSync(
-          `az keyvault secret list --vault-name "${vault}" --query [].id -o tsv`,
+        const result = execFileSync(
+          "az",
+          ["keyvault", "secret", "list", "--vault-name", vault, "--query", "[].id", "-o", "tsv"],
           { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
         );
         return result.trim().split("\n").filter(Boolean).map((id: string) => id.split("/").pop() || id);
@@ -226,7 +242,7 @@ function createAzureBackend(): SecretBackend {
       const [vault, ...secretParts] = name.split("/");
       const secret = secretParts.join("/");
       if (!secret) throw new Error("Azure backend requires name format: vault-name/secret-name");
-      execSync(`az keyvault secret set --vault-name "${vault}" --name "${secret}" --value "${value}"`, {
+      execFileSync("az", ["keyvault", "secret", "set", "--vault-name", vault, "--name", secret, "--value", value], {
         stdio: "ignore",
       });
     },

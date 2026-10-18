@@ -5,6 +5,7 @@ import os from "node:os";
 import fs from "node:fs";
 import { sessionActive } from "./auth.js";
 import { getSecretLimit } from "./license.js";
+import { keychainAvailable, keychainGet, keychainSet } from "./keychain.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -51,6 +52,24 @@ function deriveKey(salt: Buffer, passphrase: string): Buffer {
   return crypto.pbkdf2Sync(passphrase, salt, PBKDF2_ITERATIONS, KEY_LENGTH, "sha256");
 }
 
+function getKeychainAccount(): string {
+  return _projectName ? `project:${_projectName}` : "default";
+}
+
+function xorWithMachineId(data: Buffer, machineId: Buffer): Buffer {
+  const out = Buffer.alloc(data.length);
+  for (let i = 0; i < data.length; i++) {
+    out[i] = data[i] ^ machineId[i % machineId.length];
+  }
+  return out;
+}
+
+function readWrappedKeyFromFile(): Buffer | null {
+  const keyPath = getKeyPath();
+  if (!fs.existsSync(keyPath)) return null;
+  return fs.readFileSync(keyPath).subarray(SALT_LENGTH);
+}
+
 export function encrypt(value: string, key: Buffer): { encrypted: Buffer; iv: Buffer; authTag: Buffer } {
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
@@ -85,22 +104,37 @@ export function getKey(): Buffer {
     throw new Error("Keyblind vault not initialized. Run: keyblind init");
   }
 
-  const keyPath = getKeyPath();
-  if (!fs.existsSync(keyPath)) {
+  const machineId = deriveMachineIdentity();
+  let wrappedKey: Buffer | null = null;
+
+  if (keychainAvailable()) {
+    const account = getKeychainAccount();
+    const hex = keychainGet(account);
+    if (hex) {
+      const candidate = Buffer.from(hex, "hex");
+      if (candidate.length === KEY_LENGTH) {
+        wrappedKey = candidate;
+      }
+    }
+    if (!wrappedKey) {
+      // Legacy key file present but not yet migrated to Keychain.
+      wrappedKey = readWrappedKeyFromFile();
+      if (wrappedKey) {
+        keychainSet(account, wrappedKey.toString("hex"));
+        if (keychainGet(account) === wrappedKey.toString("hex")) {
+          try { fs.rmSync(getKeyPath(), { force: true }); } catch { /* keep file as fallback */ }
+        }
+      }
+    }
+  } else {
+    wrappedKey = readWrappedKeyFromFile();
+  }
+
+  if (!wrappedKey) {
     throw new Error("Keyblind key not found. Run: keyblind init");
   }
 
-  const keyData = fs.readFileSync(keyPath);
-  const salt = keyData.subarray(0, SALT_LENGTH);
-  const wrappedKey = keyData.subarray(SALT_LENGTH);
-
-  const machineId = deriveMachineIdentity();
-  const unwrappedKey = Buffer.alloc(wrappedKey.length);
-  for (let i = 0; i < wrappedKey.length; i++) {
-    unwrappedKey[i] = wrappedKey[i] ^ machineId[i % machineId.length];
-  }
-
-  _key = unwrappedKey;
+  _key = xorWithMachineId(wrappedKey, machineId);
   return _key;
 }
 
@@ -110,26 +144,34 @@ export function initializeVault(passphrase: string): void {
     fs.mkdirSync(vaultDir, { mode: 0o700, recursive: true });
   }
 
-  if (fs.existsSync(getKeyPath())) {
+  if (isInitialized()) {
     throw new Error("Keyblind is already initialized. To reset, delete ~/.keyblind/");
   }
 
   const salt = crypto.randomBytes(SALT_LENGTH);
   const key = deriveKey(salt, passphrase);
-
   const machineId = deriveMachineIdentity();
-  const wrappedKey = Buffer.alloc(key.length);
-  for (let i = 0; i < key.length; i++) {
-    wrappedKey[i] = key[i] ^ machineId[i % machineId.length];
-  }
+  const wrappedKey = xorWithMachineId(key, machineId);
 
-  fs.writeFileSync(getKeyPath(), Buffer.concat([salt, wrappedKey]), { mode: 0o600 });
+  if (keychainAvailable()) {
+    try {
+      keychainSet(getKeychainAccount(), wrappedKey.toString("hex"));
+    } catch {
+      // Keychain write failed — fall back to the file so the vault still works.
+      fs.writeFileSync(getKeyPath(), Buffer.concat([salt, wrappedKey]), { mode: 0o600 });
+    }
+  } else {
+    fs.writeFileSync(getKeyPath(), Buffer.concat([salt, wrappedKey]), { mode: 0o600 });
+  }
 
   // Pre-create the database so isInitialized() passes
   getDb();
 }
 
 export function isInitialized(): boolean {
+  if (keychainAvailable() && keychainGet(getKeychainAccount())) {
+    return true;
+  }
   return fs.existsSync(getKeyPath());
 }
 
@@ -172,6 +214,13 @@ export function getDb(): Database.Database {
   _db.exec(`
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
   `);
+  for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+    try {
+      if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
+    } catch {
+      // non-fatal on platforms without chmod semantics (e.g. Windows)
+    }
+  }
   return _db;
 }
 
