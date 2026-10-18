@@ -7,7 +7,7 @@ function getPairingSecret(): Uint8Array {
   return new Uint8Array(crypto.createHash("sha256").update(vaultKey).digest());
 }
 
-export async function generatePairingToken(port: number = 3100): Promise<{ token: string; url: string }> {
+export async function generatePairingToken(port: number = 4318): Promise<{ token: string; url: string }> {
   const nonce = crypto.randomBytes(16).toString("base64url");
   const secret = getPairingSecret();
 

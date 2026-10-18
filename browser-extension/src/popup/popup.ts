@@ -20,7 +20,7 @@ function updateStatusUI(status: VaultStatus): void {
     count.textContent = String(status.secretCount);
   } else {
     dot.className = "status-dot red";
-    dot.title = "Keyblind server not running (port 3100)";
+    dot.title = "Keyblind server not running (port 4318)";
     count.textContent = "--";
   }
 

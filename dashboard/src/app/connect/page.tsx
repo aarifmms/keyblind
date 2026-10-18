@@ -14,7 +14,7 @@ function ConnectForm() {
 
   useEffect(() => {
     const token = searchParams.get("token");
-    const port = searchParams.get("port") || "3100";
+    const port = searchParams.get("port") || "4318";
 
     if (!token) {
       setStatus("error");

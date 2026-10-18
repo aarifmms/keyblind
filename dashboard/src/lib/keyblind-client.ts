@@ -28,7 +28,8 @@ export class KeyblindClientError extends Error {
 
 export class KeyblindClient {
   constructor(
-    private baseUrl: string = "http://localhost:3100",
+    private baseUrl: string =
+      process.env.NEXT_PUBLIC_KEYBLIND_URL || "http://localhost:4318",
     private token?: string
   ) {}
 

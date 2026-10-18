@@ -554,7 +554,7 @@ export async function startServer(): Promise<void> {
   await server.connect(transport);
 }
 
-export async function startHttpServer(port: number = 3100, httpsConfig?: ACMEOptions): Promise<void> {
+export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOptions): Promise<void> {
   const mcpServer = createServer();
 
   // Single transport instance handles all requests with session management

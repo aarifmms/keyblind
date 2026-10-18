@@ -389,7 +389,7 @@ async function main(): Promise<void> {
       }
 
       case "dashboard-login": {
-        const port = parseInt(args[1] || "3100", 10);
+        const port = parseInt(args[1] || "4318", 10);
         console.error("Generating sign-in link...");
         const { url } = await generatePairingToken(port);
         const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
@@ -749,7 +749,7 @@ async function main(): Promise<void> {
           await startHttpServer(port, { domain, email, staging, port });
         } else if (httpMode) {
           const portIdx = args.indexOf("--port");
-          const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 3100;
+          const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 4318;
           await startHttpServer(port);
         } else {
           // MCP stdio transport uses stdout — startup messages MUST go to stderr

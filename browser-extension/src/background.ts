@@ -3,7 +3,7 @@ import type { VaultStatus } from "./types.js";
 // Check if keyblind CLI is available via localhost MCP server
 async function checkKeyblindStatus(): Promise<VaultStatus> {
   try {
-    const res = await fetch("http://localhost:3100/health", { signal: AbortSignal.timeout(2000) });
+    const res = await fetch("http://localhost:4318/health", { signal: AbortSignal.timeout(2000) });
     if (res.ok) {
       const data = await res.json();
       return { initialized: true, secretCount: data.secretCount || 0 };
@@ -16,7 +16,7 @@ async function checkKeyblindStatus(): Promise<VaultStatus> {
 
 async function getSecretValue(name: string): Promise<string | null> {
   try {
-    const res = await fetch("http://localhost:3100/mcp", {
+    const res = await fetch("http://localhost:4318/mcp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
