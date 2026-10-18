@@ -6,7 +6,7 @@ const COMMANDS = [
   "activate", "deactivate", "status",
   "team", "generate", "import", "export", "doctor",
   "completions", "config",
-  "help", "unlock",
+  "help", "unlock", "lock", "gate",
 ];
 
 const FLAGS: Record<string, string> = {

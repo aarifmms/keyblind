@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, setRequireSession, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
+import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -50,6 +50,8 @@ Usage:
   keyblind start --http        Start MCP HTTP server (for Smithery, remote)
   keyblind start --biometric   Start MCP server with biometric requirement
   keyblind unlock              Authenticate with biometric (cross-platform)
+  keyblind gate on|off         Require a biometric session for all secret access
+  keyblind lock                Immediately lock the vault (clear session)
   keyblind run <command...>    Run a command with secrets as env vars
   keyblind sandbox [.env]      Replace real env values with deterministic fakes
   keyblind unsandbox [.env]    Restore real env values from vault
@@ -775,6 +777,34 @@ async function main(): Promise<void> {
         }
         createSession();
         console.log("Vault unlocked. Session active for 15 minutes.");
+        break;
+      }
+
+      case "gate": {
+        const action = args[1];
+        if (action === "on") {
+          requirePro();
+          if (!biometricAvailable()) {
+            console.error("Biometric auth is not available on this system.");
+            process.exit(1);
+          }
+          setSessionRequirement(true);
+          console.log("Biometric gate enabled. Secrets now require an active session.");
+          console.log("Run 'keyblind unlock' to open a 15-minute session, 'keyblind lock' to close it.");
+        } else if (action === "off") {
+          setSessionRequirement(false);
+          clearSession();
+          console.log("Biometric gate disabled.");
+        } else {
+          console.log(`Biometric gate: ${isSessionRequired() ? "on" : "off"}`);
+          console.log("Usage: keyblind gate on|off");
+        }
+        break;
+      }
+
+      case "lock": {
+        clearSession();
+        console.log("Vault locked. Next secret access requires 'keyblind unlock'.");
         break;
       }
 

@@ -92,10 +92,28 @@ export function setRequireSession(requireSession: boolean): void {
   _requireSession = requireSession;
 }
 
+function sessionMarkerPath(): string {
+  return path.join(getVaultDir(), ".require-session");
+}
+
+export function isSessionRequired(): boolean {
+  return fs.existsSync(sessionMarkerPath());
+}
+
+export function setSessionRequirement(enabled: boolean): void {
+  if (enabled) {
+    const dir = getVaultDir();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { mode: 0o700, recursive: true });
+    fs.writeFileSync(sessionMarkerPath(), "", { mode: 0o600 });
+  } else {
+    fs.rmSync(sessionMarkerPath(), { force: true });
+  }
+}
+
 export function getKey(): Buffer {
   if (_key) return _key;
 
-  if (_requireSession && !sessionActive()) {
+  if ((_requireSession || isSessionRequired()) && !sessionActive()) {
     throw new Error("Biometric session expired or not started. Run: keyblind unlock");
   }
 
