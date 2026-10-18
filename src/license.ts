@@ -8,6 +8,9 @@ import os from "node:os";
 // public key via KEYBLIND_PUBLIC_KEYS (JSON array or comma-separated) or
 // KEYBLIND_PUBLIC_KEY. The baked fallback keys are always tried last.
 const FALLBACK_PUBLIC_KEYS = [
+  // Canonical signing key (matches KEYBLIND_SIGNING_KEY in Vercel).
+  "MCowBQYDK2VwAyEAEDrfxLZJHQJyz2dlarqdJbrkfcwWYAqQk8462bfNzI4=",
+  // Original launch key.
   "MCowBQYDK2VwAyEAaxu7ncsxw3rW0Sycd9iIVu4prMKbsjN9hZghJYI2LoY=",
   // gmail re-issue key (lic_fd7a064f5d18d2bc, aarifmms@gmail.com)
   "MCowBQYDK2VwAyEAnZz1qlGZu/oXSVo19765RijwLBaR7ajFiYW07K15ORQ=",
