@@ -568,6 +568,9 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Mcp-Session-Id, Accept");
+    // Allow the public dashboard (app.keyblind.dev) to reach this local server
+    // from a secure context (Chrome Private Network Access / local network checks).
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
