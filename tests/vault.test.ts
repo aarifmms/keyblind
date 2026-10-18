@@ -1,21 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 // We need to intercept the vault path before vault.ts loads its module-level state.
 // The vault uses ~/.keyblind/ — we redirect to a temp dir for testing.
-const tmpDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "keyblind-test-")));
-const vaultDir = path.join(tmpDir, ".keyblind");
+const state = vi.hoisted(() => ({ tmpDir: "" }));
 
-// Intercept os.homedir so vault.ts creates files in our temp directory
+// Intercept os.homedir so vault.ts creates files in our temp directory.
+// vault.ts uses `import os from "node:os"`, so we must override the default export
+// (and compute the temp dir lazily to avoid the TDZ from auth.ts calling
+// os.homedir() at module load).
 vi.mock("node:os", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:os")>();
-  return {
-    ...actual,
-    homedir: () => tmpDir,
+  const homedir = () => {
+    if (!state.tmpDir) {
+      state.tmpDir = path.join(fs.mkdtempSync(path.join(actual.tmpdir(), "keyblind-test-")));
+    }
+    return state.tmpDir;
   };
+  return { ...actual, homedir, default: { ...actual.default, homedir } };
 });
 
 // Now we can dynamically import vault after mocking
@@ -33,12 +37,12 @@ import {
 
 beforeAll(() => {
   // Create temp home so vault init doesn't fail on missing directory
-  fs.mkdirSync(tmpDir, { recursive: true });
+  fs.mkdirSync(state.tmpDir, { recursive: true });
 });
 
 afterAll(() => {
   closeDb();
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.rmSync(state.tmpDir, { recursive: true, force: true });
 });
 
 describe("encrypt / decrypt", () => {

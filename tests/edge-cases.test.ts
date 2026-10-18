@@ -1,13 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 
-const tmpDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "keyblind-edge-")));
+const state = vi.hoisted(() => ({ tmpDir: "" }));
 
 vi.mock("node:os", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:os")>();
-  return { ...actual, homedir: () => tmpDir };
+  const homedir = () => {
+    if (!state.tmpDir) {
+      state.tmpDir = path.join(fs.mkdtempSync(path.join(actual.tmpdir(), "keyblind-edge-")));
+    }
+    return state.tmpDir;
+  };
+  return { ...actual, homedir, default: { ...actual.default, homedir } };
 });
 
 import {
@@ -21,13 +26,13 @@ import {
 } from "../src/vault.js";
 
 beforeAll(() => {
-  fs.mkdirSync(tmpDir, { recursive: true });
+  fs.mkdirSync(state.tmpDir, { recursive: true });
   if (!isInitialized()) initializeVault("test-passphrase");
 });
 
 afterAll(() => {
   closeDb();
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.rmSync(state.tmpDir, { recursive: true, force: true });
 });
 
 describe("special characters in secret names", () => {

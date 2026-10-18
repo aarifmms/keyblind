@@ -100,8 +100,16 @@ fi
   return hookPath;
 }
 
+function isTestFile(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, "/");
+  return (
+    /(^|\/)(tests?|__tests__|spec)(\/|$)/.test(normalized) ||
+    /\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$/.test(normalized)
+  );
+}
+
 export function checkAndReport(): { found: number; output: string } {
-  const files = getStagedFiles();
+  const files = getStagedFiles().filter((f) => !isTestFile(f));
 
   if (files.length === 0) {
     return { found: 0, output: "" };
