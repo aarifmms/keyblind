@@ -2,9 +2,18 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "keyblind-dashboard-dev-secret-change-in-production"
-);
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET must be set in production");
+    }
+    return "keyblind-dashboard-dev-secret-change-in-production";
+  }
+  return secret;
+}
+
+const SECRET = new TextEncoder().encode(getJwtSecret());
 
 const PUBLIC_PATHS = ["/login", "/activate", "/connect"];
 

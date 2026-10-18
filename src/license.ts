@@ -3,21 +3,30 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-// Ed25519 public key (baked into binary — the private key never ships)
-const PUBLIC_KEY_BASE64 = process.env.KEYBLIND_PUBLIC_KEY || "MCowBQYDK2VwAyEAaxu7ncsxw3rW0Sycd9iIVu4prMKbsjN9hZghJYI2LoY=";
+// Ed25519 public keys accepted for license verification, in priority order.
+// Rotate the signing key without breaking existing licenses by appending the new
+// public key via KEYBLIND_PUBLIC_KEYS (JSON array or comma-separated) or
+// KEYBLIND_PUBLIC_KEY. The baked fallback is always tried last.
+const FALLBACK_PUBLIC_KEY = "MCowBQYDK2VwAyEAaxu7ncsxw3rW0Sycd9iIVu4prMKbsjN9hZghJYI2LoY=";
 
-function getPublicKey(): crypto.KeyObject {
-  if (!PUBLIC_KEY_BASE64) {
-    throw new Error(
-      "License validation is not available in this build. " +
-      "Use the official npm package: npm install -g keyblind"
-    );
+function getPublicKeys(): string[] {
+  const keys: string[] = [];
+
+  const list = process.env.KEYBLIND_PUBLIC_KEYS;
+  if (list) {
+    try {
+      const parsed = JSON.parse(list);
+      if (Array.isArray(parsed)) keys.push(...parsed);
+      else keys.push(...list.split(","));
+    } catch {
+      keys.push(...list.split(","));
+    }
   }
-  return crypto.createPublicKey({
-    key: Buffer.from(PUBLIC_KEY_BASE64, "base64"),
-    format: "der",
-    type: "spki",
-  });
+
+  if (process.env.KEYBLIND_PUBLIC_KEY) keys.push(process.env.KEYBLIND_PUBLIC_KEY);
+  keys.push(FALLBACK_PUBLIC_KEY);
+
+  return keys.filter(Boolean).map((k) => k.trim());
 }
 
 export interface LicenseInfo {
@@ -73,14 +82,24 @@ function verifyLicenseKey(key: string): LicenseInfo | null {
   // Reconstruct the signed data
   const data = Buffer.from(JSON.stringify(payload));
 
-  // Verify Ed25519 signature
-  try {
-    const pubKey = getPublicKey();
-    const valid = crypto.verify(null, data, pubKey, signature);
-    if (!valid) return null;
-  } catch {
-    return null;
+  // Verify Ed25519 signature against any accepted public key
+  let valid = false;
+  for (const keyB64 of getPublicKeys()) {
+    try {
+      const pubKey = crypto.createPublicKey({
+        key: Buffer.from(keyB64, "base64"),
+        format: "der",
+        type: "spki",
+      });
+      if (crypto.verify(null, data, pubKey, signature)) {
+        valid = true;
+        break;
+      }
+    } catch {
+      // Skip malformed keys
+    }
   }
+  if (!valid) return null;
 
   // Check expiry
   const expDate = new Date(payload.exp + "T23:59:59Z");

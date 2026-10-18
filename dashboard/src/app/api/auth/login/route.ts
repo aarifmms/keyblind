@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSessionToken } from "@/lib/auth";
+import { createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 import { verifyLicenseKey } from "@/lib/license";
 
 export async function POST(req: Request) {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 24h
+      maxAge: SESSION_MAX_AGE,
     });
 
     return res;

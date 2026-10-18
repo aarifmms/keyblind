@@ -1,8 +1,20 @@
 import * as jose from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "keyblind-dashboard-dev-secret-change-in-production"
-);
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET must be set in production");
+    }
+    return "keyblind-dashboard-dev-secret-change-in-production";
+  }
+  return secret;
+}
+
+const SECRET = new TextEncoder().encode(getJwtSecret());
+
+// 30-day session so users don't re-enter their license key daily
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 export interface SessionUser {
   email: string;
@@ -15,7 +27,7 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
   return new jose.SignJWT(user as unknown as jose.JWTPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setExpirationTime("30d")
     .sign(SECRET);
 }
 
