@@ -15,6 +15,7 @@ import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { createHttpsServer, certExists, certExpiringSoon, provisionCert, startAutoRenewal, type ACMEOptions } from "./https.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
+import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance } from "./ledger.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -469,6 +470,81 @@ export function createServer(): McpServer {
     },
   );
 
+  // Agent Accountability ledger tools
+  server.tool(
+    "register_agent",
+    "Register an AI agent in the Know Your Agent registry, bound to a human sponsor. Returns the agent identity and its Ed25519 private key, which the agent holds to sign its own actions.",
+    {
+      name: z.string().describe("Human-readable agent name (e.g., billing-agent)"),
+      sponsor: z.string().describe("Human accountable for this agent (email or name)"),
+      scope: z.string().optional().describe("What the agent is authorized to do (e.g., read:invoices)"),
+    },
+    async ({ name, sponsor, scope }) => {
+      try {
+        const { identity, privateKey } = registerAgent(name, sponsor, scope ?? "");
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ identity, privateKey, note: "Store this private key securely — it signs actions as this agent." }),
+          }],
+        };
+      } catch (err: any) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "record_action",
+    "Append a signed action to the tamper-proof agent ledger. Each entry is hash-chained and Ed25519-signed, so any later edit or reorder is detectable.",
+    {
+      agentId: z.string().describe("The agent ID returned by register_agent"),
+      privateKey: z.string().describe("The agent's Ed25519 private key (base64)"),
+      action: z.string().describe("The action taken (e.g., resolve_secret, store_secret)"),
+      target: z.string().optional().describe("The target of the action (e.g., a secret name)"),
+      metadata: z.string().optional().describe("JSON string with extra context"),
+    },
+    async ({ agentId, privateKey, action, target, metadata }) => {
+      try {
+        const entry = recordAction(agentId, privateKey, action, target ?? "", metadata ?? "{}");
+        return { content: [{ type: "text", text: JSON.stringify(entry) }] };
+      } catch (err: any) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "verify_ledger",
+    "Verify the integrity of the agent action ledger by re-walking the hash chain and signatures. Returns the first sequence that fails if the ledger was tampered with.",
+    {},
+    async () => {
+      const result = verify();
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.tool(
+    "list_agents",
+    "List all agents in the Know Your Agent registry.",
+    {},
+    async () => {
+      return { content: [{ type: "text", text: JSON.stringify({ agents: listAgents() }) }] };
+    },
+  );
+
+  server.tool(
+    "export_compliance",
+    "Export the agent action ledger as a compliance report (JSON or CSV) with human-sponsor attribution.",
+    {
+      format: z.enum(["json", "csv"]).optional().describe("Output format (default: json)"),
+    },
+    async ({ format }) => {
+      const report = exportCompliance(format ?? "json");
+      return { content: [{ type: "text", text: report }] };
+    },
+  );
+
   return server;
 }
 
@@ -555,6 +631,44 @@ export async function startHttpServer(port: number = 3100, httpsConfig?: ACMEOpt
       const entries = getAuditLog(limit);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ entries }));
+      return;
+    }
+
+    // ── Agent ledger REST API ──
+    if (req.url === "/api/agents" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ agents: listAgents() }));
+      return;
+    }
+
+    if (req.url === "/api/agents" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const { name, sponsor, scope } = JSON.parse(body);
+        if (!name || !sponsor) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "name and sponsor required" })); return; }
+        const { identity, privateKey } = registerAgent(name, sponsor, scope || "");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ identity, privateKey }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
+      return;
+    }
+
+    if (req.url === "/api/agents/ledger" && req.method === "GET") {
+      const verification = verify();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ verification, entries: listEntries() }));
+      return;
+    }
+
+    if (req.url?.startsWith("/api/agents/export") && req.method === "GET") {
+      const url = new URL(req.url, `http://localhost:${port}`);
+      const format = url.searchParams.get("format") === "csv" ? "csv" : "json";
+      const report = exportCompliance(format);
+      res.writeHead(200, {
+        "Content-Type": format === "csv" ? "text/csv" : "application/json",
+        "Content-Disposition": `attachment; filename="agent-ledger.${format}"`,
+      });
+      res.end(report);
       return;
     }
 

@@ -107,6 +107,41 @@ export class KeyblindClient {
     return result.entries || [];
   }
 
+  // Agent ledger (Know Your Agent)
+  async getAgents(): Promise<any[]> {
+    const result = await this.rest("/api/agents");
+    return result.agents || [];
+  }
+
+  async registerAgent(name: string, sponsor: string, scope?: string): Promise<{ identity: any; privateKey: string }> {
+    return this.rest("/api/agents", {
+      method: "POST",
+      body: JSON.stringify({ name, sponsor, scope }),
+    });
+  }
+
+  async getAgentLedger(): Promise<{ verification: any; entries: any[] }> {
+    const result = await this.rest("/api/agents/ledger");
+    return { verification: result.verification, entries: result.entries || [] };
+  }
+
+  async exportLedger(format: "json" | "csv" = "json"): Promise<string> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/api/agents/export?format=${format}`, {
+        headers: { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+      });
+    } catch {
+      throw new KeyblindClientError(
+        "Could not reach Keyblind. Make sure it's running: keyblind start --http",
+        null,
+        true
+      );
+    }
+    if (!res.ok) throw new KeyblindClientError(`Server error (HTTP ${res.status})`, res.status, false);
+    return res.text();
+  }
+
   // TOTP
   async getTOTPConfigs(): Promise<TOTPConfig[]> {
     const result = await this.rest("/api/totp");
