@@ -243,7 +243,9 @@ export function deactivateLicense(): { success: boolean; message: string } {
 }
 
 export function getSecretLimit(): number {
-  // Dev/CI mode — bypass limit for testing
+  // Dev/CI mode — bypass limit for testing. The production build (scripts/build.mjs)
+  // bakes process.env.KEYBLIND_DEV to "false" via esbuild --define and minifies the
+  // branch away, so this only works when running from source (tests/CI).
   if (process.env.KEYBLIND_DEV === "true") return Infinity;
   const info = getLicenseInfo();
   if (info && info.tier !== "free") return Infinity;

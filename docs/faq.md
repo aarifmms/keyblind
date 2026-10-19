@@ -32,7 +32,7 @@ License keys are Ed25519-signed JSON payloads. The public key is baked into the 
 
 ## Can I use Keyblind in CI/CD?
 
-Yes. Set `KEYBLIND_DEV=true` for unlimited secrets in CI (no license needed for public repositories). For private repos, use a Pro license via GitHub Secrets.
+Yes. For public repositories, run the test suite from source with `KEYBLIND_DEV=true`. This dev/CI bypass is compile-time only — it is stripped from the published npm package, so it cannot be used to unlock unlimited secrets in a normal install. For production use and private repos, use a Pro license via GitHub Secrets.
 
 ## What MCP tools does Keyblind expose?
 
