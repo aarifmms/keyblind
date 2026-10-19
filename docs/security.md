@@ -156,6 +156,16 @@ const iv = crypto.randomBytes(12);
 - **Permissions**: `0600` (owner read/write only)
 - **Keychain directory**: `~/.keyblind/` permissions `0700`
 
+### Wrapped Master Key
+
+The master key is XOR-wrapped with the machine fingerprint and stored in the OS keyring, never as a plaintext file:
+
+- **macOS**: Keychain (`security` CLI, service `keyblind`)
+- **Linux**: libsecret (`secret-tool` CLI, Secret Service)
+- **Windows**: DPAPI (`ProtectedData`, blob in `~/.keyblind/*.dpapi`, mode `0600`)
+
+When no OS keyring is available (e.g. Linux without a running Secret Service), Keyblind falls back to the legacy key file `~/.keyblind/.keyblind.key` (mode `0600`).
+
 ### What's Stored in Plaintext
 
 - Secret names (for querying)

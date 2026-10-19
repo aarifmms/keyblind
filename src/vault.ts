@@ -143,12 +143,16 @@ export function getKey(): Buffer {
       }
     }
     if (!wrappedKey) {
-      // Legacy key file present but not yet migrated to Keychain.
+      // Legacy key file present but not yet migrated to the OS keyring.
       wrappedKey = readWrappedKeyFromFile();
       if (wrappedKey) {
-        keychainSet(account, wrappedKey.toString("hex"));
-        if (keychainGet(account) === wrappedKey.toString("hex")) {
-          try { fs.rmSync(getKeyPath(), { force: true }); } catch { /* keep file as fallback */ }
+        try {
+          keychainSet(account, wrappedKey.toString("hex"));
+          if (keychainGet(account) === wrappedKey.toString("hex")) {
+            try { fs.rmSync(getKeyPath(), { force: true }); } catch { /* keep file as fallback */ }
+          }
+        } catch {
+          // OS keyring unavailable (e.g. no Secret Service running) — keep the file.
         }
       }
     }
