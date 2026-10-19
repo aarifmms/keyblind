@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
+import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -884,6 +884,7 @@ async function main(): Promise<void> {
 
       case "lock": {
         clearSession();
+        clearKey();
         console.log("Vault locked. Next secret access requires 'keyblind unlock'.");
         break;
       }

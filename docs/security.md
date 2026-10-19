@@ -190,7 +190,7 @@ const iv = crypto.randomBytes(12);
 | License tampering | **LOW** | Ed25519 signatures verified offline. Cannot forge without private key |
 | Share link intercepted | **LOW-MED** | Fragment never sent to server. But link can be intercepted via browser history or phishing |
 | Replay of old share links | **LOW** | TTL + expiry enforcement |
-| Memory dump of running process | **MEDIUM** | DEK is in memory while vault is open. Mitigate with shorter session lifetimes |
+| Memory dump of running process | **MEDIUM** | Plaintext/key buffers are zeroed after use; DEK is zeroed on `keyblind lock`. But the resolved JS string cannot be wiped. Mitigate with shorter session lifetimes |
 | Dependency compromise | **MEDIUM** | Only 3 runtime deps (better-sqlite3, stripe, resend) + stdlib crypto |
 
 ## Recommendations for Production Deployments

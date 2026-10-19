@@ -81,7 +81,15 @@ export function encrypt(value: string, key: Buffer): { encrypted: Buffer; iv: Bu
 export function decrypt(encrypted: Buffer, iv: Buffer, authTag: Buffer, key: Buffer): string {
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
   decipher.setAuthTag(authTag);
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+  const plaintext = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+  try {
+    return plaintext.toString("utf8");
+  } finally {
+    // Zero the mutable plaintext buffer. The returned JS string cannot be
+    // deterministically wiped (V8 strings are immutable and GC may copy them),
+    // so this reduces residue but does not eliminate it.
+    plaintext.fill(0);
+  }
 }
 
 let _db: Database.Database | null = null;
@@ -153,6 +161,8 @@ export function getKey(): Buffer {
   }
 
   _key = xorWithMachineId(wrappedKey, machineId);
+  wrappedKey.fill(0);
+  machineId.fill(0);
   return _key;
 }
 
@@ -380,5 +390,8 @@ export function closeDb(): void {
 }
 
 export function clearKey(): void {
-  _key = null;
+  if (_key) {
+    _key.fill(0);
+    _key = null;
+  }
 }
