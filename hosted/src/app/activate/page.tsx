@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Shield, Check, Copy, Terminal, ArrowRight } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Shield, Check, Copy, Terminal } from "lucide-react";
 
 function ActivateContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -11,7 +11,6 @@ function ActivateContent() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
   const searchParams = useSearchParams();
-  const router = useRouter();
   const sessionId = searchParams.get("session_id");
 
   useEffect(() => {
@@ -47,8 +46,7 @@ function ActivateContent() {
     { label: "Install Keyblind CLI", cmd: "npm install -g keyblind" },
     { label: "Activate your license", cmd: licenseKey ? `keyblind activate ${licenseKey}` : "" },
     { label: "Initialize your vault", cmd: "keyblind init" },
-    { label: "Start the server", cmd: "keyblind start --http" },
-    { label: "Sign into dashboard", cmd: "keyblind dashboard-login" },
+    { label: "Open your dashboard", cmd: "keyblind dashboard" },
   ].filter((c) => c.cmd);
 
   if (status === "loading") {
@@ -121,7 +119,7 @@ function ActivateContent() {
             </button>
           </div>
           <p className="text-xs text-[#8b949e] mt-2">
-            Also sent to your email. Save this key — you&apos;ll need it to sign into the dashboard.
+            Also sent to your email. Save this key — you&apos;ll need it to activate Keyblind.
           </p>
         </div>
       )}
@@ -158,22 +156,14 @@ function ActivateContent() {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <button
-          onClick={() => router.push("/login")}
-          className="flex items-center justify-center gap-1 flex-1 bg-[#1f6feb] text-white rounded-md py-2 text-sm font-medium hover:bg-[#1a5fd4]"
-        >
-          Sign In <ArrowRight className="w-3 h-3" />
-        </button>
-        <a
-          href="https://keyblind.dev"
-          target="_blank"
-          rel="noopener"
-          className="flex items-center gap-1 justify-center flex-1 border border-[#30363d] text-[#c9d1d9] rounded-md py-2 text-sm hover:bg-[#21262d]"
-        >
-          Homepage
-        </a>
-      </div>
+      <a
+        href="https://keyblind.dev"
+        target="_blank"
+        rel="noopener"
+        className="flex items-center justify-center gap-1 w-full border border-[#30363d] text-[#c9d1d9] rounded-md py-2 text-sm hover:bg-[#21262d]"
+      >
+        Homepage
+      </a>
     </div>
   );
 }

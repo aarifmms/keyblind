@@ -3,19 +3,22 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { storeSecret, listSecrets, deleteSecret, resolveSecret, isInitialized, getAuditLog, setClientInfo } from "./vault.js";
 import { getBackend } from "./backends.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { generateTOTPCode, storeTOTP, listTOTP, deleteTOTP, parseOTPAuthURI, getTOTP, type TOTPConfig } from "./totp.js";
 import { createShareLink, receiveShare } from "./share.js";
 import { getDeadmanStatus, checkin } from "./deadman.js";
-import { verifyPairingToken } from "./pairing.js";
-import { getLicenseKey } from "./license.js";
+import { getLicenseInfo, isPro, featuresEnabled, getSecretLimit } from "./license.js";
 import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { createHttpsServer, certExists, certExpiringSoon, provisionCert, startAutoRenewal, type ACMEOptions } from "./https.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
-import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance } from "./ledger.js";
+import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired } from "./ledger.js";
+import { getVersion } from "./version.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,12 +29,106 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
+// Returns a deny reason for a signed secret-access request, or null to allow.
+// When no agentId is supplied the call is unenforced (backwards compatible with
+// direct CLI / human use) unless mandatory enforcement is enabled, in which case
+// anonymous access is refused. Supplying agentId opts into signed scope checks.
+function checkAgentAccess(
+  agentId: string | undefined,
+  signature: string | undefined,
+  action: "read" | "write",
+  target: string,
+): string | null {
+  if (!agentId) {
+    return isAgentScopeRequired() ? "Agent identity required (agent scope enforcement is enabled)" : null;
+  }
+  return authorizeAction(agentId, action, target, signature ?? "");
+}
+
+// The dashboard static export ships next to the compiled server: dist/dashboard/.
+const dashboardDir = fileURLToPath(new URL("./dashboard/", import.meta.url));
+
+const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".map": "application/json",
+  ".webmanifest": "application/manifest+json",
+};
+
+function serveDashboard(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const rawPath = decodeURIComponent((req.url || "/").split("?")[0]);
+  // Next.js client-side navigation fetches the RSC payload (.txt) with this header.
+  const isRsc = req.headers["rsc"] === "1";
+
+  let rel = rawPath.replace(/^\/+/, "");
+  if (rel === "") rel = isRsc ? "index.txt" : "index.html";
+
+  const root = path.resolve(dashboardDir);
+  const resolved = path.resolve(dashboardDir, rel);
+  if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end("Forbidden");
+    return;
+  }
+
+  const candidates = [resolved];
+  if (!path.extname(resolved)) {
+    const idx = isRsc ? "index.txt" : "index.html";
+    const alt = isRsc ? "index.html" : "index.txt";
+    candidates.push(path.join(resolved, idx), path.join(resolved, alt));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.statSync(candidate).isFile()) {
+        const ext = path.extname(candidate).toLowerCase();
+        const type = MIME_TYPES[ext] || "application/octet-stream";
+        const body = fs.readFileSync(candidate);
+        res.writeHead(200, {
+          "Content-Type": type,
+          "Cache-Control": ext === ".html" || ext === ".txt" ? "no-cache" : "public, max-age=31536000, immutable",
+        });
+        res.end(req.method === "HEAD" ? undefined : body);
+        return;
+      }
+    } catch {
+      // fall through to next candidate / fallback
+    }
+  }
+
+  // SPA fallback: unknown extensionless routes map to index.html for client-side routing.
+  if (!path.extname(resolved)) {
+    try {
+      const indexFile = path.join(root, "index.html");
+      if (fs.statSync(indexFile).isFile()) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+        res.end(req.method === "HEAD" ? undefined : fs.readFileSync(indexFile));
+        return;
+      }
+    } catch {
+      // no index.html — fall through to 404
+    }
+  }
+
+  res.writeHead(404, { "Content-Type": "text/plain" });
+  res.end("Not found");
+}
+
 export function createServer(): McpServer {
   setClientInfo("mcp");
 
   const server = new McpServer({
     name: "keyblind",
-    version: "0.6.0",
+    version: getVersion(),
   });
 
   server.tool(
@@ -39,13 +136,20 @@ export function createServer(): McpServer {
     "Resolve a secret by name using the configured backend (local vault, 1Password, Bitwarden, or env vars). Returns the decrypted value at runtime. The secret value is never visible in the LLM conversation transcript — it is resolved just-in-time for the current operation.",
     {
       name: z.string().describe("The name of the secret to resolve (e.g., OPENAI_API_KEY, DATABASE_URL)"),
+      agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'read:<name>' in base64 (optional)"),
     },
-    async ({ name }) => {
+    async ({ name, agentId, signature }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
           isError: true,
         };
+      }
+
+      const deny = checkAgentAccess(agentId, signature, "read", name);
+      if (deny) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
       const backend = getBackend();
@@ -70,13 +174,20 @@ export function createServer(): McpServer {
     {
       name: z.string().describe("A unique name for the secret (e.g., OPENAI_API_KEY, DATABASE_URL)"),
       value: z.string().describe("The secret value to encrypt and store"),
+      agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>' in base64 (optional)"),
     },
-    async ({ name, value }) => {
+    async ({ name, value, agentId, signature }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
           isError: true,
         };
+      }
+
+      const deny = checkAgentAccess(agentId, signature, "write", name);
+      if (deny) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
       storeSecret(name, value);
@@ -89,12 +200,20 @@ export function createServer(): McpServer {
   server.tool(
     "list_secrets",
     "List all stored secret names (names only — values are never revealed in this listing).",
-    {},
-    async () => {
+    {
+      agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'read:*' in base64 (optional)"),
+    },
+    async ({ agentId, signature }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: JSON.stringify({ secrets: [] }) }],
         };
+      }
+
+      const deny = checkAgentAccess(agentId, signature, "read", "*");
+      if (deny) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
       const names = listSecrets().filter((n) => !n.startsWith("_keyblind") && !n.startsWith("_totp") && !n.startsWith("__keyblind"));
@@ -177,13 +296,20 @@ export function createServer(): McpServer {
     "Delete a secret from the vault.",
     {
       name: z.string().describe("The name of the secret to delete"),
+      agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>' in base64 (optional)"),
     },
-    async ({ name }) => {
+    async ({ name, agentId, signature }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
           isError: true,
         };
+      }
+
+      const deny = checkAgentAccess(agentId, signature, "write", name);
+      if (deny) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
       const deleted = deleteSecret(name);
@@ -554,7 +680,7 @@ export async function startServer(): Promise<void> {
   await server.connect(transport);
 }
 
-export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOptions): Promise<void> {
+export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOptions, host: string = "127.0.0.1"): Promise<void> {
   const mcpServer = createServer();
 
   // Single transport instance handles all requests with session management
@@ -579,9 +705,28 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
     }
 
     // Health check
-    if (req.url === "/health" || req.url === "/") {
+    if (req.url === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", server: "keyblind", version: "0.5.1", secretCount: isInitialized() ? listSecrets().filter((n: string) => !n.startsWith("_keyblind") && !n.startsWith("_totp")).length : 0 }));
+      res.end(JSON.stringify({ status: "ok", server: "keyblind", version: getVersion(), secretCount: isInitialized() ? listSecrets().filter((n: string) => !n.startsWith("_keyblind") && !n.startsWith("_totp")).length : 0 }));
+      return;
+    }
+
+    // Status (dashboard license/tier surface — no auth needed on localhost)
+    if (req.url === "/api/status" && req.method === "GET") {
+      const info = getLicenseInfo();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        initialized: isInitialized(),
+        tier: info ? info.tier : "free",
+        email: info ? info.email : null,
+        exp: info ? info.exp : null,
+        iat: info ? info.iat : null,
+        id: info ? info.id : null,
+        pro: isPro(),
+        features: featuresEnabled(),
+        secretLimit: getSecretLimit(),
+        version: getVersion(),
+      }));
       return;
     }
 
@@ -845,32 +990,15 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
       return;
     }
 
-    // ── Dashboard pairing ──
-    if (req.url === "/api/auth/pair" && req.method === "POST") {
-      const body = await readBody(req);
-      try {
-        const { token } = JSON.parse(body);
-        if (!token) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "token required" })); return; }
-        const result = await verifyPairingToken(token);
-        if (!result.valid) { res.writeHead(401, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Invalid or expired pairing token" })); return; }
-        const licenseKey = getLicenseKey();
-        if (!licenseKey) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "No license activated. Run 'keyblind activate <key>' first." }));
-          return;
-        }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-          verified: true,
-          licenseKey,
-        }));
-      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
-      return;
-    }
-
     // MCP endpoint
     if (req.url === "/mcp" || req.url?.startsWith("/mcp")) {
       await transport.handleRequest(req, res);
+      return;
+    }
+
+    // Static dashboard (same-origin with the REST API, so no CORS/LNA needed)
+    if (req.method === "GET" || req.method === "HEAD") {
+      serveDashboard(req, res);
       return;
     }
 
@@ -904,8 +1032,9 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
   const httpServer = http.createServer(appHandler);
 
   return new Promise((resolve) => {
-    httpServer.listen(port, () => {
+    httpServer.listen(port, host, () => {
       console.log(`Keyblind MCP HTTP server listening on http://localhost:${port}`);
+      console.log(`  Dashboard:    http://localhost:${port}/`);
       console.log(`  MCP endpoint: http://localhost:${port}/mcp`);
       console.log(`  Health:       http://localhost:${port}/health`);
       resolve();

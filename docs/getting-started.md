@@ -52,10 +52,10 @@ Keyblind resolves secrets at runtime — the plaintext never appears in the conv
 ## Web Dashboard
 
 ```bash
-keyblind start --http
+keyblind dashboard
 ```
 
-Then sign in at [app.keyblind.dev](https://app.keyblind.dev) with your license key.
+This starts the local server and opens `http://localhost:4318/` in your browser — already authenticated, no sign-in or pairing. It shows your license tier and secrets.
 
 ## Sandbox Your .env
 

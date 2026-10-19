@@ -107,17 +107,17 @@ claude mcp add keyblind -- keyblind start --biometric
 
 ## Web Dashboard
 
-Manage your secrets from a browser at **[app.keyblind.dev](https://app.keyblind.dev)**. Start the HTTP server:
+Manage your secrets from a browser — **no sign-in or pairing required**. Open the local dashboard:
 
 ```bash
-keyblind start --http
+keyblind dashboard
 ```
 
-Then sign in with your license key at [app.keyblind.dev/login](https://app.keyblind.dev/login). Features:
+This starts the local server and opens `http://localhost:4318/` in your browser. The dashboard is served same-origin with the REST API, so it works in every browser with no CORS, no pairing token, and no login. Features:
 
 - View, add, copy, and delete secrets
 - Audit log with full access history
-- License management
+- License management (tier, email, expiry)
 - Pro/Team tier status
 
 ## Browser Extension
@@ -192,7 +192,7 @@ keyblind backend bitwarden                 # Switch to Bitwarden
 | **Storage** | AES-256-GCM SQLite | AES-256-GCM file |
 | **Backends** | Local, 1Password, Bitwarden, Env, AWS, GCP, Azure | Local only |
 | **Sandbox** | Deterministic HMAC fakes | AES-256-GCM encrypted |
-| **Web dashboard** | ✓ (app.keyblind.dev) | — |
+| **Web dashboard** | ✓ (localhost:4318) | — |
 | **Browser extension** | ✓ (Chrome) | — |
 | **TOTP 2FA** | ✓ | — |
 | **Secret sharing** | ✓ (encrypted URL fragment) | — |
@@ -226,7 +226,8 @@ keyblind sandbox [.env]       Replace .env with deterministic fakes
 keyblind unsandbox [.env]     Restore real .env values
 keyblind run <command...>     Run command with secrets as env vars
 keyblind start                Start MCP server (stdio — for AI agents)
-keyblind start --http         Start MCP HTTP server (for dashboard)
+keyblind start --http         Start HTTP server (dashboard + MCP + REST API)
+keyblind dashboard            Open the web dashboard in your browser
 keyblind start --biometric    Start MCP server with biometric requirement
 keyblind backends             List available backends
 keyblind backend <name>       Switch backend

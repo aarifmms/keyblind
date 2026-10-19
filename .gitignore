@@ -9,3 +9,4 @@ dist
 .env.test
 .next
 keyblind.mcpb
+dashboard/out

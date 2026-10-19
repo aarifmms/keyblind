@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 import { generateLicenseKey } from "@/lib/license-gen";
 
 export async function POST(req: Request) {
@@ -41,33 +40,13 @@ export async function POST(req: Request) {
     // Generate license key deterministically from session ID
     const licenseKey = generateLicenseKey(tier, email, expDate, sessionId);
 
-    // Email is sent by the Stripe webhook (checkout.session.completed)
-    // We only show the key on screen here to avoid duplicate emails
-
-    // Create session
-    const token = await createSessionToken({
-      email,
-      tier,
-      licenseId: sessionId,
-      expiresAt: expDate,
-    });
-
-    const res = NextResponse.json({
+    return NextResponse.json({
       success: true,
       email,
       licenseKey,
       tier,
       expDate,
     });
-
-    res.cookies.set("keyblind_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: SESSION_MAX_AGE,
-    });
-
-    return res;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }

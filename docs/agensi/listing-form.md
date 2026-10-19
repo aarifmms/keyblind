@@ -134,7 +134,7 @@ A: 5 secrets with all 16 tools and every feature.
 Suggested captures:
 1. Landing page hero/pricing (keyblind.dev)
 2. `keyblind list` CLI output - names only, values hidden
-3. Dashboard secrets view (app.keyblind.dev)
+3. Dashboard secrets view (localhost:4318 — `keyblind dashboard`)
 4. A Claude Code session resolving a secret at runtime
 
 ### Demo video URL

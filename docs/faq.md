@@ -30,6 +30,14 @@ Your secrets are unrecoverable. The passphrase encrypts the vault key. There is 
 
 License keys are Ed25519-signed JSON payloads. The public key is baked into the binary. Validation happens entirely offline — no phone-home. See [Security Design](./security.md) for details.
 
+## How do I sign up / activate?
+
+There are **no accounts and no sign-in** — Keyblind is fully local.
+
+- **Free tier** — install and go: `npm i -g keyblind`, then `keyblind init`. You get 5 secrets, all 7 backends, and all 16 MCP tools.
+- **Pro/Team** — buy a license at [keyblind.dev](https://keyblind.dev), receive the key by email, then run `keyblind activate <your-license-key>`.
+- **Dashboard** — `keyblind dashboard` opens `http://localhost:4318/` in your browser, already authenticated. No login, no pairing token.
+
 ## Can I use Keyblind in CI/CD?
 
 Yes. For public repositories, run the test suite from source with `KEYBLIND_DEV=true`. This dev/CI bypass is compile-time only — it is stripped from the published npm package, so it cannot be used to unlock unlimited secrets in a normal install. For production use and private repos, use a Pro license via GitHub Secrets.

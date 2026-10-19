@@ -15,6 +15,19 @@ export interface DeadmanStatus {
   triggered: boolean;
 }
 
+export interface KeyblindStatus {
+  initialized: boolean;
+  tier: "free" | "pro" | "team";
+  email: string | null;
+  exp: string | null;
+  iat: string | null;
+  id: string | null;
+  pro: boolean;
+  features: Record<string, boolean>;
+  secretLimit: number;
+  version: string;
+}
+
 export class KeyblindClientError extends Error {
   constructor(
     message: string,
@@ -28,8 +41,7 @@ export class KeyblindClientError extends Error {
 
 export class KeyblindClient {
   constructor(
-    private baseUrl: string =
-      process.env.NEXT_PUBLIC_KEYBLIND_URL || "http://localhost:4318",
+    private baseUrl: string = process.env.NEXT_PUBLIC_KEYBLIND_URL || "",
     private token?: string
   ) {}
 
@@ -69,6 +81,10 @@ export class KeyblindClient {
     } catch {
       return false;
     }
+  }
+
+  async getStatus(): Promise<KeyblindStatus> {
+    return this.rest("/api/status");
   }
 
   // Secrets

@@ -12,6 +12,12 @@ import {
   listAgents,
   listEntries,
   exportCompliance,
+  scopeMatches,
+  signRequest,
+  verifyAgentSignature,
+  authorizeAction,
+  isAgentScopeRequired,
+  setAgentScopeRequirement,
 } from "../src/ledger.js";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-test-"));
@@ -82,5 +88,48 @@ describe("agent ledger", () => {
     expect(csv.split("\n")[0]).toContain("sponsor");
     const json = exportCompliance("json");
     expect(JSON.parse(json)).toHaveLength(1);
+  });
+
+  it("matches scope grammar", () => {
+    expect(scopeMatches("*", "read", "anything")).toBe(true);
+    expect(scopeMatches("read:*", "read", "DB_PASSWORD")).toBe(true);
+    expect(scopeMatches("read:*", "write", "DB_PASSWORD")).toBe(false);
+    expect(scopeMatches("read:invoices", "read", "invoices")).toBe(true);
+    expect(scopeMatches("read:prod-*", "read", "prod-api-key")).toBe(true);
+    expect(scopeMatches("read:prod-*", "read", "dev-api-key")).toBe(false);
+    expect(scopeMatches("read:invoices write:invoices", "write", "invoices")).toBe(true);
+    expect(scopeMatches("read:invoices write:invoices", "read", "payments")).toBe(false);
+    expect(scopeMatches("", "read", "anything")).toBe(false);
+    expect(scopeMatches("read:inv* read:pay", "read", "invoices")).toBe(true);
+  });
+
+  it("signs and verifies a request, rejecting tampering", () => {
+    const { identity, privateKey } = registerAgent("scoped-agent", "eve@corp.com", "read:invoices");
+    const sig = signRequest(privateKey, "read", "invoices");
+    expect(verifyAgentSignature(identity.id, "read", "invoices", sig)).toBe(true);
+    expect(verifyAgentSignature(identity.id, "read", "payments", sig)).toBe(false);
+    expect(verifyAgentSignature(identity.id, "write", "invoices", sig)).toBe(false);
+  });
+
+  it("authorizes in-scope and denies out-of-scope actions", () => {
+    const { identity, privateKey } = registerAgent("scoped-agent2", "frank@corp.com", "read:invoices");
+    const okSig = signRequest(privateKey, "read", "invoices");
+    expect(authorizeAction(identity.id, "read", "invoices", okSig)).toBeNull();
+
+    const outSig = signRequest(privateKey, "read", "payments");
+    expect(authorizeAction(identity.id, "read", "payments", outSig)).toMatch(/Out of scope/);
+
+    expect(authorizeAction("nonexistent", "read", "invoices", okSig)).toBe("Unknown agent");
+
+    const badSig = signRequest(privateKey, "read", "invoices").slice(0, -4) + "AAAA";
+    expect(authorizeAction(identity.id, "read", "invoices", badSig)).toBe("Invalid agent signature");
+  });
+
+  it("toggles the mandatory enforcement flag", () => {
+    expect(isAgentScopeRequired()).toBe(false);
+    setAgentScopeRequirement(true);
+    expect(isAgentScopeRequired()).toBe(true);
+    setAgentScopeRequirement(false);
+    expect(isAgentScopeRequired()).toBe(false);
   });
 });

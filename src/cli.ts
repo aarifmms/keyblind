@@ -18,7 +18,7 @@ import { createShareLink, receiveShare } from "./share.js";
 import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger } from "./deadman.js";
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll } from "./setup-mcp.js";
-import { generatePairingToken } from "./pairing.js";
+import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement } from "./ledger.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import readline from "node:readline";
@@ -58,7 +58,7 @@ Usage:
   keyblind backends            List available secret backends
   keyblind install-hook        Install pre-commit hook to detect secrets
   keyblind setup-mcp           Configure MCP server for Claude Code & other editors
-  keyblind dashboard-login     Generate one-time sign-in link for the web dashboard
+  keyblind dashboard           Open the local dashboard (http://localhost:4318)
   keyblind check-secrets       Scan staged files for secrets (used by hook)
   keyblind scan-secrets <file...>  Scan specific files for secrets
   keyblind backend <name>      Switch active secret backend
@@ -69,6 +69,11 @@ Usage:
   keyblind activate <key>      Activate a Keyblind Pro/Team license
   keyblind deactivate          Deactivate and remove current license
   keyblind status              Show license and vault status
+  keyblind agents list         List registered AI agents
+  keyblind agents register <name> <sponsor> [scope]  Register an agent (prints private key)
+  keyblind agents verify       Verify agent ledger integrity
+  keyblind agents export [json|csv]  Export compliance report
+  keyblind agents enforce on|off  Require signed agent identity for secret access
   keyblind team init [path]    Create a shared team vault (git-safe)
   keyblind team push <name>     Push a local secret to the team vault
   keyblind team pull            Import all team secrets to local vault
@@ -388,15 +393,23 @@ async function main(): Promise<void> {
         break;
       }
 
-      case "dashboard-login": {
-        const port = parseInt(args[1] || "4318", 10);
-        console.error("Generating sign-in link...");
-        const { url } = await generatePairingToken(port);
+      case "dashboard": {
+        if (!isInitialized()) {
+          console.error("Keyblind not initialized. Run: keyblind init");
+          process.exit(1);
+        }
+        getKey();
+        const portIdx = args.indexOf("--port");
+        const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 4318;
+        const host = args.includes("--lan") ? "0.0.0.0" : "127.0.0.1";
+        const url = `http://localhost:${port}/`;
         const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-        execSync(`${openCmd} "${url}"`);
-        console.log("Browser opened. Sign in to continue.");
-        console.log("If the browser doesn't open, visit:");
-        console.log(`  ${url}`);
+        // Open the browser after the server has had a moment to bind.
+        setTimeout(() => {
+          try { execSync(`${openCmd} "${url}"`); } catch { /* user can open manually */ }
+        }, 600);
+        console.log(`Opening dashboard at ${url}`);
+        await startHttpServer(port, undefined, host);
         break;
       }
 
@@ -578,6 +591,72 @@ async function main(): Promise<void> {
         break;
       }
 
+      case "agents": {
+        const sub = args[1];
+        if (!sub) {
+          console.error("Usage: keyblind agents <list|register|verify|export|enforce>");
+          process.exit(1);
+        }
+        switch (sub) {
+          case "list": {
+            const agents = listAgents();
+            if (agents.length === 0) {
+              console.log("No agents registered.");
+            } else {
+              for (const a of agents) {
+                console.log(`  ${a.id}  ${a.name}  sponsor=${a.sponsor}  scope=${a.scope || "(none)"}`);
+              }
+            }
+            break;
+          }
+          case "register": {
+            const name = args[2];
+            const sponsor = args[3];
+            const scope = args[4] ?? "";
+            if (!name || !sponsor) {
+              console.error("Usage: keyblind agents register <name> <sponsor> [scope]");
+              console.error('  scope examples: "*", "read:*", "read:invoices write:invoices"');
+              process.exit(1);
+            }
+            const { identity, privateKey } = registerAgent(name, sponsor, scope);
+            console.log(`Registered agent ${identity.name} (${identity.id})`);
+            console.log(`  sponsor: ${identity.sponsor}`);
+            console.log(`  scope:   ${identity.scope || "(none)"}`);
+            console.log(`  private key (store securely, signs actions): ${privateKey}`);
+            break;
+          }
+          case "verify": {
+            const result = verifyLedger();
+            console.log(result.valid ? `Ledger OK (${result.entries} entries)` : `Ledger TAMPERED at sequence ${result.brokenAt}`);
+            if (!result.valid) process.exit(1);
+            break;
+          }
+          case "export": {
+            const format = args[2] === "csv" ? "csv" : "json";
+            console.log(exportCompliance(format));
+            break;
+          }
+          case "enforce": {
+            const mode = args[2];
+            if (mode === "on") {
+              setAgentScopeRequirement(true);
+              console.log("Agent scope enforcement enabled. Secret access now requires a signed agent identity.");
+            } else if (mode === "off") {
+              setAgentScopeRequirement(false);
+              console.log("Agent scope enforcement disabled.");
+            } else {
+              console.log(`Agent scope enforcement is currently ${isAgentScopeRequired() ? "ON" : "OFF"}.`);
+              console.log("Usage: keyblind agents enforce on|off");
+            }
+            break;
+          }
+          default:
+            console.error("Usage: keyblind agents <list|register|verify|export|enforce>");
+            process.exit(1);
+        }
+        break;
+      }
+
       case "audit": {
         requirePro();
         if (!isInitialized()) {
@@ -750,7 +829,8 @@ async function main(): Promise<void> {
         } else if (httpMode) {
           const portIdx = args.indexOf("--port");
           const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 4318;
-          await startHttpServer(port);
+          const host = args.includes("--lan") ? "0.0.0.0" : "127.0.0.1";
+          await startHttpServer(port, undefined, host);
         } else {
           // MCP stdio transport uses stdout — startup messages MUST go to stderr
           console.error("Keyblind MCP server started (stdio transport).");

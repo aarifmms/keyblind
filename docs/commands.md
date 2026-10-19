@@ -78,7 +78,8 @@ Supports Google, Okta, Azure AD, and generic OIDC providers.
 
 ```bash
 keyblind start                  # MCP server (stdio — for AI agents)
-keyblind start --http           # MCP HTTP server on port 4318 (for dashboard)
+keyblind start --http           # HTTP server on port 4318 (dashboard + MCP + REST API)
+keyblind dashboard              # Open the web dashboard in your browser (localhost:4318)
 keyblind start --http --port 4000
 keyblind start --biometric      # Require Touch ID before resolving secrets
 keyblind start --http --https --domain example.com --email admin@example.com

@@ -17,5 +17,4 @@ export { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTr
 export { provisionCert, createHttpsServer, startAutoRenewal, certExists, certExpiringSoon, type ACMEOptions, type CertPaths } from "./https.js";
 export { configureSSO, ssoLogin, ssoLogout, getSSOToken, isSSOAuthenticated, getSSOConfig, type SSOConfig, type SSOToken, type IDTokenClaims } from "./sso.js";
 export { setupAll, type SetupResult } from "./setup-mcp.js";
-export { generatePairingToken, verifyPairingToken } from "./pairing.js";
-export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";
+export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, scopeMatches, signRequest, verifyAgentSignature, authorizeAction, isAgentScopeRequired, setAgentScopeRequirement, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";

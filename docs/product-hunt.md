@@ -48,8 +48,8 @@ Comparison table from landing page.
 Caption: "Why Keyblind: MCP-native (not editor-specific), 16 tools vs 3, 7 backends vs 1, deterministic sandbox."
 
 ### Image 5: Web Dashboard
-Screenshot of app.keyblind.dev showing sidebar, secrets list, and health indicator.
-Caption: "Web dashboard at app.keyblind.dev. CLI pairing login. Manage secrets, TOTP, sharing, team vaults."
+Screenshot of the local dashboard (localhost:4318) showing sidebar, secrets list, and health indicator.
+Caption: "Web dashboard at localhost:4318. No login or pairing. Manage secrets, TOTP, sharing, team vaults."
 
 ---
 
@@ -72,9 +72,9 @@ What's shipped in v0.6.0 (just published today):
   switch, team vaults, SSO, audit log, HTTPS, alerts
 - 7 backends — local, 1Password, Bitwarden, env, AWS, GCP, Azure
 - 40+ CLI commands
-- Web dashboard (app.keyblind.dev) with CLI pairing login
+- Web dashboard served locally (localhost:4318) — no login, no pairing
 - Chrome extension (paste interception on AI chat sites)
-- Browser auto-open on `keyblind dashboard-login`
+- Browser auto-open on `keyblind dashboard`
 - Terraform provider (skeleton, Go)
 
 Key differentiator from Cloak (launched last week): Keyblind is MCP-

@@ -129,6 +129,104 @@ export function listAgents(): AgentIdentity[] {
   ).map((r) => ({ id: r.id, name: r.name, sponsor: r.sponsor, scope: r.scope, publicKey: r.public_key, createdAt: r.created_at }));
 }
 
+// ── Scope enforcement ────────────────────────────────────────────────────────
+//
+// An agent's `scope` is a declarative allow-list of what it may do. Grammar:
+//   scope     := permission (whitespace | ',' | ';')* permission*
+//   permission := "*" | action ":" glob
+//   action    := "read" | "write" | "*"
+//   glob      := "*" (all) | shell-style wildcard over secret names
+//
+// Examples: "*", "read:*", "read:prod-* write:prod-*", "read:invoices write:invoices".
+// Empty scope ("") grants nothing — a signed request with no declared scope is denied.
+
+function globMatch(pattern: string, target: string): boolean {
+  let re = "^";
+  for (const c of pattern) {
+    if (c === "*") re += ".*";
+    else re += c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  re += "$";
+  return new RegExp(re).test(target);
+}
+
+export function scopeMatches(scope: string, action: "read" | "write", target: string): boolean {
+  for (const perm of scope.split(/[\s,;]+/)) {
+    const p = perm.trim();
+    if (!p) continue;
+    if (p === "*") return true;
+    const idx = p.indexOf(":");
+    if (idx === -1) continue;
+    const permAction = p.slice(0, idx);
+    const pattern = p.slice(idx + 1);
+    if (permAction !== action && permAction !== "*") continue;
+    if (pattern === "*" || globMatch(pattern, target)) return true;
+  }
+  return false;
+}
+
+function requestPayload(action: string, target: string): string {
+  return `${action}:${target}`;
+}
+
+// Signs a secret-access request with the agent's private key. The signature
+// binds the action + target, proving the caller holds this agent's identity.
+export function signRequest(privateKeyB64: string, action: string, target: string): string {
+  const priv = crypto.createPrivateKey({ key: Buffer.from(privateKeyB64, "base64"), format: "der", type: "pkcs8" });
+  return crypto.sign(null, Buffer.from(requestPayload(action, target)), priv).toString("base64");
+}
+
+// Verifies a signed secret-access request against the agent's stored public key.
+export function verifyAgentSignature(agentId: string, action: string, target: string, signatureB64: string): boolean {
+  const agent = getAgent(agentId);
+  if (!agent) return false;
+  try {
+    const pub = crypto.createPublicKey({ key: Buffer.from(agent.publicKey, "base64"), format: "der", type: "spki" });
+    return crypto.verify(null, Buffer.from(requestPayload(action, target)), pub, Buffer.from(signatureB64, "base64"));
+  } catch {
+    return false;
+  }
+}
+
+// Checks an agent's scope and returns a deny reason, or null if allowed.
+// Verifies the signature before consulting the scope, so an invalid signature
+// is indistinguishable from a valid-but-out-of-scope one at the call site.
+export function authorizeAction(agentId: string, action: "read" | "write", target: string, signatureB64: string): string | null {
+  const agent = getAgent(agentId);
+  if (!agent) return "Unknown agent";
+  if (!verifyAgentSignature(agentId, action, target, signatureB64)) return "Invalid agent signature";
+  if (!scopeMatches(agent.scope, action, target)) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
+  return null;
+}
+
+// ── Mandatory enforcement flag ───────────────────────────────────────────────
+//
+// When enabled (a marker file exists at ~/.keyblind/.require-agent-scope), every
+// secret-access MCP call must carry a valid signed agent identity; anonymous
+// access is refused. Off by default so direct CLI / human use keeps working.
+
+function ledgerHome(): string {
+  return _dbPath ? path.dirname(_dbPath) : path.join(os.homedir(), ".keyblind");
+}
+
+function scopeMarkerPath(): string {
+  return path.join(ledgerHome(), ".require-agent-scope");
+}
+
+export function isAgentScopeRequired(): boolean {
+  return fs.existsSync(scopeMarkerPath());
+}
+
+export function setAgentScopeRequirement(enabled: boolean): void {
+  if (enabled) {
+    const dir = path.dirname(scopeMarkerPath());
+    fs.mkdirSync(dir, { mode: 0o700, recursive: true });
+    fs.writeFileSync(scopeMarkerPath(), "", { mode: 0o600 });
+  } else {
+    fs.rmSync(scopeMarkerPath(), { force: true });
+  }
+}
+
 export function recordAction(agentId: string, privateKeyB64: string, action: string, target = "", metadata = "{}"): LedgerEntry {
   const db = getDb();
   const agent = getAgent(agentId);
