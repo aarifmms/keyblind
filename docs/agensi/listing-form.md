@@ -28,7 +28,7 @@ What you get:
 - Works with every MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed
 - Optional backends: 1Password, Bitwarden, env vars, AWS, GCP, Azure
 
-Free: 5 secrets, all features. Pro: unlimited ($79/yr).
+Free: 5 secrets, all features. Fully usable - no purchase required.
 ```
 
 ## Step 3 - Demo
@@ -127,7 +127,7 @@ Q: Does it work with my editor?
 A: Any MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed. It's protocol-level, not editor-specific.
 
 Q: What does the free tier include?
-A: 5 secrets with all 16 tools and every feature. Pro ($79/year) unlocks unlimited secrets.
+A: 5 secrets with all 16 tools and every feature.
 ```
 
 ### Screenshots (up to 6)

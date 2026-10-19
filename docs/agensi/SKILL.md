@@ -37,9 +37,9 @@ Then restart your agent.
 ## Use
 
 ```bash
-keyblind set OPENAI_API_KEY      # store encrypted (prompts securely)
+keyblind set MY_API_KEY      # store encrypted (prompts securely)
 keyblind sandbox                 # agents see deterministic fakes in .env
-keyblind get OPENAI_API_KEY      # resolve the decrypted value
+keyblind get MY_API_KEY      # resolve the decrypted value
 keyblind run -- npm start        # run a command with secrets as env vars
 keyblind list                    # names only - values never shown
 ```
@@ -55,4 +55,4 @@ The agent calls MCP tools such as `resolve_secret`, `store_secret`, `list_secret
 
 ## Pricing
 
-Free: 5 secrets. Pro: unlimited ($79/year) at https://keyblind.dev
+Free: 5 secrets with all 16 tools. Fully usable - no purchase required.

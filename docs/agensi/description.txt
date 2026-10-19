@@ -7,4 +7,4 @@ Keyblind keeps secrets encrypted at rest and resolves them just-in-time through 
 - Works with every MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed
 - 16 tools - secrets CRUD, TOTP 2FA, encrypted sharing, dead man's switch, .env sandbox, audit log
 - One-command setup: npm i -g keyblind && keyblind setup-mcp
-- Free: 5 secrets. Pro: unlimited ($79/yr) at keyblind.dev
+- Free: 5 secrets, all features. Fully usable - no purchase required.
