@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
+import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -69,6 +69,7 @@ Usage:
   keyblind activate <key>      Activate a Keyblind Pro/Team license
   keyblind deactivate          Deactivate and remove current license
   keyblind status              Show license and vault status
+  keyblind rotate-key          Rotate the master key and re-encrypt all secrets
   keyblind agents list         List registered AI agents
   keyblind agents register <name> <sponsor> [scope]  Register an agent (prints private key)
   keyblind agents verify       Verify agent ledger integrity
@@ -781,6 +782,16 @@ async function main(): Promise<void> {
         console.log(`  Vault:      ~/.keyblind/`);
         const backend = getBackend();
         console.log(`  Backend:    ${backend.name}`);
+        break;
+      }
+
+      case "rotate-key": {
+        if (!isInitialized()) {
+          console.error("Keyblind not initialized. Run: keyblind init");
+          process.exit(1);
+        }
+        const { rotated } = rotateMasterKey();
+        console.log(`Master key rotated. Re-encrypted ${rotated} secret${rotated === 1 ? "" : "s"}.`);
         break;
       }
 

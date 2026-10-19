@@ -33,6 +33,7 @@ import {
   deleteSecret,
   isInitialized,
   closeDb,
+  rotateMasterKey,
 } from "../src/vault.js";
 
 beforeAll(() => {
@@ -133,5 +134,29 @@ describe("vault CRUD", () => {
     expect(deleteSecret("DELETE_TEST")).toBe(true);
     expect(resolveSecret("DELETE_TEST")).toBeNull();
     expect(deleteSecret("DELETE_TEST")).toBe(false);
+  });
+});
+
+describe("master key rotation", () => {
+  beforeAll(() => {
+    if (!isInitialized()) initializeVault("test-passphrase");
+  });
+
+  it("re-encrypts secrets under a new key without losing data", () => {
+    storeSecret("ROTATE_TEST", "rotate-me-123");
+
+    const keyFile = path.join(state.tmpDir, ".keyblind", ".keyblind.key");
+    const before = fs.readFileSync(keyFile);
+
+    const { rotated } = rotateMasterKey();
+    expect(rotated).toBeGreaterThan(0);
+
+    const after = fs.readFileSync(keyFile);
+    expect(after.equals(before)).toBe(false); // wrapped key changed
+
+    expect(resolveSecret("ROTATE_TEST")).toBe("rotate-me-123");
+
+    storeSecret("ROTATE_TEST_2", "post-rotate");
+    expect(resolveSecret("ROTATE_TEST_2")).toBe("post-rotate");
   });
 });

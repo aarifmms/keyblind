@@ -60,6 +60,8 @@ const kek = crypto.pbkdf2Sync(passphrase, salt, 600_000, 32, "sha256");
 
 **Rationale**: 600K iterations balances security with startup time (~200ms on modern hardware). Per OWASP 2025 guidelines, the minimum is 600K for PBKDF2-SHA256.
 
+**Rotation**: `keyblind rotate-key` replaces the passphrase-derived key with a fresh random 32-byte DEK and re-encrypts every secret (and version-history entry) under it in a single SQLite transaction. After rotation, the master key is no longer derivable from the passphrase, so a leaked passphrase alone cannot decrypt the vault — the attacker also needs the new wrapped key.
+
 ### 2. Machine-Identity-Bound Key (DEK)
 
 The Data Encryption Key (DEK) is derived by XOR-wrapping the KEK with a machine fingerprint:
@@ -199,7 +201,7 @@ const iv = crypto.randomBytes(12);
 2. **Set KEYBLIND_SESSION_TIMEOUT** to auto-lock after inactivity
 3. **Never commit `.keyblind/`** to version control
 4. **Use `keyblind sandbox`** for all projects that interact with AI tools
-5. **Rotate passphrases** if you suspect vault compromise
+5. **Rotate the master key** (`keyblind rotate-key`) after suspected key exposure or to invalidate old vault backups
 6. **Enable HTTPS** for remote MCP access (`keyblind start --https --domain X`)
 7. **Set up dead man's switch** for team vault passphrase recovery
 

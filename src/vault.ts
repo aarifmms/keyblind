@@ -196,6 +196,22 @@ export function initializeVault(passphrase: string): void {
   getDb();
 }
 
+function writeWrappedKey(wrappedKey: Buffer): void {
+  if (keychainAvailable()) {
+    try {
+      keychainSet(getKeychainAccount(), wrappedKey.toString("hex"));
+      try { fs.rmSync(getKeyPath(), { force: true }); } catch { /* no legacy file */ }
+      return;
+    } catch {
+      // Keychain write failed — fall back to the file.
+    }
+  }
+  const dir = getVaultDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { mode: 0o700, recursive: true });
+  const salt = crypto.randomBytes(SALT_LENGTH);
+  fs.writeFileSync(getKeyPath(), Buffer.concat([salt, wrappedKey]), { mode: 0o600 });
+}
+
 export function isInitialized(): boolean {
   if (keychainAvailable() && keychainGet(getKeychainAccount())) {
     return true;
@@ -393,5 +409,60 @@ export function clearKey(): void {
   if (_key) {
     _key.fill(0);
     _key = null;
+  }
+}
+
+export function rotateMasterKey(): { rotated: number } {
+  const oldKey = getKey();
+  const newKey = crypto.randomBytes(KEY_LENGTH);
+  const machineId = deriveMachineIdentity();
+  const newWrappedKey = xorWithMachineId(newKey, machineId);
+
+  try {
+    // Persist the new wrapped key first; keep oldKey in memory so a failed
+    // re-encryption can restore it. The SQLite transaction is atomic, but the
+    // key write happens outside it.
+    writeWrappedKey(newWrappedKey);
+    newWrappedKey.fill(0);
+
+    const db = getDb();
+    const rotate = db.transaction((): number => {
+      let count = 0;
+      const secrets = db.prepare("SELECT name, encrypted_value, iv, auth_tag FROM secrets").all() as
+        { name: string; encrypted_value: Buffer; iv: Buffer; auth_tag: Buffer }[];
+      const updSecret = db.prepare("UPDATE secrets SET encrypted_value = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE name = ?");
+      for (const r of secrets) {
+        const value = decrypt(r.encrypted_value, r.iv, r.auth_tag, oldKey);
+        const { encrypted, iv, authTag } = encrypt(value, newKey);
+        updSecret.run(encrypted, iv, authTag, r.name);
+        count++;
+      }
+
+      const hasHistory = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'secret_history'").get();
+      if (hasHistory) {
+        const history = db.prepare("SELECT id, encrypted_value, iv, auth_tag FROM secret_history").all() as
+          { id: number; encrypted_value: Buffer; iv: Buffer; auth_tag: Buffer }[];
+        const updHist = db.prepare("UPDATE secret_history SET encrypted_value = ?, iv = ?, auth_tag = ? WHERE id = ?");
+        for (const r of history) {
+          const value = decrypt(r.encrypted_value, r.iv, r.auth_tag, oldKey);
+          const { encrypted, iv, authTag } = encrypt(value, newKey);
+          updHist.run(encrypted, iv, authTag, r.id);
+          count++;
+        }
+      }
+      return count;
+    });
+
+    const count = rotate();
+    _key = newKey;
+    oldKey.fill(0);
+    machineId.fill(0);
+    return { rotated: count };
+  } catch (err) {
+    // Restore the old wrapped key so the vault still decrypts, then scrub.
+    try { writeWrappedKey(xorWithMachineId(oldKey, machineId)); } catch { /* rollback best-effort */ }
+    newKey.fill(0);
+    machineId.fill(0);
+    throw err;
   }
 }
