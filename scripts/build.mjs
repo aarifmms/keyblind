@@ -6,7 +6,15 @@
 // works when running from source (tests/CI). Type declarations are emitted
 // separately by tsc (see package.json "build").
 import { build } from "esbuild";
-import { readdirSync } from "node:fs";
+import { readdirSync, rmSync, existsSync } from "node:fs";
+
+// Remove stale sourcemaps from prior builds. We ship without maps so the
+// published tarball contains no embedded original source.
+if (existsSync("dist")) {
+  for (const f of readdirSync("dist")) {
+    if (f.endsWith(".map")) rmSync(`dist/${f}`, { force: true });
+  }
+}
 
 const entries = readdirSync("src")
   .filter((f) => f.endsWith(".ts"))
@@ -19,7 +27,6 @@ await build({
   platform: "node",
   format: "esm",
   target: "node18",
-  sourcemap: true,
   define: { "process.env.KEYBLIND_DEV": '"false"' },
   minify: true,
 });
