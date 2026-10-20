@@ -17,7 +17,7 @@ import { storeTOTP, getTOTP, listTOTP, deleteTOTP, generateTOTPCode, parseOTPAut
 import { createShareLink, receiveShare } from "./share.js";
 import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger } from "./deadman.js";
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
-import { setupAll } from "./setup-mcp.js";
+import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
 import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies } from "./ledger.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
@@ -72,7 +72,8 @@ Usage:
   keyblind unsandbox [.env]    Restore real env values from vault
   keyblind backends            List available secret backends
   keyblind install-hook        Install pre-commit hook to detect secrets
-  keyblind setup-mcp           Configure MCP server for Claude Code
+  keyblind setup-mcp           Configure MCP for Claude Code, Cline, Zed (global)
+  keyblind setup-mcp --local   Write project configs (Cursor, Windsurf, Copilot, Cline)
   keyblind dashboard           Open the local dashboard (http://localhost:4318)
   keyblind check-secrets       Scan staged files for secrets (used by hook)
   keyblind scan-secrets <file...>  Scan specific files for secrets
@@ -143,6 +144,7 @@ Usage:
 
 Global flags:
   --project <name>            Use a project-specific vault (isolated per project)
+  --editors <list>            setup-mcp --local: restrict to cursor,windsurf,copilot,cline
 
 Examples:
   keyblind quickstart
@@ -231,8 +233,7 @@ async function initVaultInteractive(): Promise<void> {
   console.log("Configure Claude Code with: keyblind setup-mcp");
 }
 
-function runSetupMcp(): void {
-  const results = setupAll();
+function printSetupResults(results: SetupResult[]): void {
   for (const r of results) {
     if (r.action === "configured") {
       console.log(`✓ ${r.editor}: MCP server configured`);
@@ -246,6 +247,15 @@ function runSetupMcp(): void {
   }
 }
 
+function runSetupMcp(local: boolean = false, editors?: string[]): void {
+  if (local) {
+    printSetupResults(setupLocal(process.cwd(), editors));
+    console.log("\nProject configs written. They're commit-safe (no secrets) — commit or .gitignore as you prefer.");
+    return;
+  }
+  printSetupResults(setupAll());
+}
+
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
 
@@ -255,6 +265,17 @@ async function main(): Promise<void> {
     const projectName = rawArgs[projectIdx + 1];
     setProjectName(projectName);
     rawArgs.splice(projectIdx, 2); // Remove --project and its value
+  }
+
+  // Parse --local and --editors flags (setup-mcp project-local configs)
+  const localIdx = rawArgs.indexOf("--local");
+  const local = localIdx !== -1;
+  if (localIdx !== -1) rawArgs.splice(localIdx, 1);
+  let editors: string[] | undefined;
+  const editorsIdx = rawArgs.indexOf("--editors");
+  if (editorsIdx !== -1 && editorsIdx + 1 < rawArgs.length) {
+    editors = rawArgs[editorsIdx + 1].split(",").map((e) => e.trim()).filter(Boolean);
+    rawArgs.splice(editorsIdx, 2);
   }
 
   const args = rawArgs;
@@ -415,8 +436,12 @@ async function main(): Promise<void> {
       }
 
       case "setup-mcp": {
-        runSetupMcp();
-        console.log("\nRestart your editor, then try: 'list my keyblind secrets'");
+        runSetupMcp(local, editors);
+        if (local) {
+          console.log("Restart your editor, then try: 'list my keyblind secrets'");
+        } else {
+          console.log("\nRestart your editor, then try: 'list my keyblind secrets'");
+        }
         break;
       }
 

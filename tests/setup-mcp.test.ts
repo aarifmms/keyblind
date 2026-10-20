@@ -20,7 +20,7 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
-import { mergeMcpServer, setupAll } from "../src/setup-mcp.js";
+import { mergeMcpServer, setupAll, setupLocal } from "../src/setup-mcp.js";
 
 beforeEach(() => {
   state.tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "keyblind-mcp-"));
@@ -95,5 +95,49 @@ describe("setupAll", () => {
     expect(zed.action).toBe("configured");
     const file = JSON.parse(fs.readFileSync(path.join(zedDir, "settings.json"), "utf8"));
     expect(file.mcp_servers.keyblind).toEqual({ command: "keyblind", args: ["start"] });
+  });
+});
+
+describe("setupLocal", () => {
+  function localCwd(): string {
+    const dir = path.join(state.tmpDir, "project");
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  it("writes all four project configs by default", () => {
+    const cwd = localCwd();
+    const results = setupLocal(cwd);
+    expect(results.map((r) => r.editor).sort()).toEqual(
+      ["Cline (project)", "Copilot", "Cursor", "Windsurf"].sort()
+    );
+    expect(results.every((r) => r.action === "configured")).toBe(true);
+    for (const f of [".cursor/mcp.json", ".windsurf/mcp.json", ".vscode/mcp.json", ".cline/mcp.json"]) {
+      expect(fs.existsSync(path.join(cwd, f))).toBe(true);
+    }
+  });
+
+  it("restricts to the requested editors", () => {
+    const cwd = localCwd();
+    const results = setupLocal(cwd, ["cursor", "copilot"]);
+    expect(results.map((r) => r.editor).sort()).toEqual(["Copilot", "Cursor"]);
+    expect(fs.existsSync(path.join(cwd, ".cursor/mcp.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, ".vscode/mcp.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, ".windsurf/mcp.json"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, ".cline/mcp.json"))).toBe(false);
+  });
+
+  it("uses the `servers` key for Copilot", () => {
+    const cwd = localCwd();
+    setupLocal(cwd, ["copilot"]);
+    const file = JSON.parse(fs.readFileSync(path.join(cwd, ".vscode/mcp.json"), "utf8"));
+    expect(file.servers.keyblind).toEqual({ command: "keyblind", args: ["start"] });
+  });
+
+  it("is idempotent on a second run", () => {
+    const cwd = localCwd();
+    setupLocal(cwd);
+    const results = setupLocal(cwd);
+    expect(results.every((r) => r.action === "already_configured")).toBe(true);
   });
 });

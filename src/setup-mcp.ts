@@ -131,3 +131,41 @@ function setupZed(): SetupResult {
 export function setupAll(): SetupResult[] {
   return [setupClaudeCode(), setupCline(), setupZed()];
 }
+
+interface ProjectEditor {
+  key: string; // lowercase matcher for --editors, e.g. "cursor"
+  editor: string; // display label
+  file: string; // path relative to cwd
+  configKey: string;
+}
+
+const PROJECT_EDITORS: ProjectEditor[] = [
+  { key: "cursor", editor: "Cursor", file: ".cursor/mcp.json", configKey: "mcpServers" },
+  { key: "windsurf", editor: "Windsurf", file: ".windsurf/mcp.json", configKey: "mcpServers" },
+  { key: "copilot", editor: "Copilot", file: ".vscode/mcp.json", configKey: "servers" },
+  { key: "cline", editor: "Cline (project)", file: ".cline/mcp.json", configKey: "mcpServers" },
+];
+
+// Write project-local MCP configs into cwd. These files contain only the
+// keyblind command (no secrets), so they are safe to commit. `editors` is an
+// optional list of lowercase editor keys to restrict which files are written.
+export function setupLocal(cwd: string, editors?: string[]): SetupResult[] {
+  const wanted = editors?.length ? new Set(editors.map((e) => e.toLowerCase().trim())) : null;
+  const results: SetupResult[] = [];
+  for (const pe of PROJECT_EDITORS) {
+    if (wanted && !wanted.has(pe.key)) continue;
+    const result = mergeMcpServer(
+      path.join(cwd, pe.file),
+      pe.configKey,
+      { command: "keyblind", args: ["start"] }
+    );
+    if (result.error) {
+      results.push({ editor: pe.editor, action: "failed", error: result.error });
+    } else if (result.already) {
+      results.push({ editor: pe.editor, action: "already_configured" });
+    } else {
+      results.push({ editor: pe.editor, action: "configured" });
+    }
+  }
+  return results;
+}

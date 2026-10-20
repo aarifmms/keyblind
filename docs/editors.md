@@ -12,6 +12,17 @@ This auto-configures Claude Code, Cline, and Zed globally. Works from any direct
 
 Under the hood, it runs `claude mcp add --scope user keyblind -- keyblind start` for Claude Code, and merges `keyblind` into `~/.cline/mcp_settings.json` and `~/.zed/settings.json` for Cline and Zed (only if those directories exist).
 
+### Project-local setup (Cursor, Windsurf, Copilot, Cline project)
+
+Cursor, Windsurf, Copilot, and Cline (project mode) read their MCP config from the repo, not `$HOME`. Run this from your project root:
+
+```bash
+keyblind setup-mcp --local            # write all four project configs
+keyblind setup-mcp --local --editors cursor,copilot   # restrict to specific editors
+```
+
+This merges `keyblind` into `.cursor/mcp.json`, `.windsurf/mcp.json`, `.vscode/mcp.json`, and `.cline/mcp.json`. The files contain only the keyblind command (no secrets), so they are safe to commit.
+
 ## Manual Setup for Other Editors
 
 ### Claude Code (manual)
