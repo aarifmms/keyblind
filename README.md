@@ -119,6 +119,7 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - Audit log with full access history
 - License management (tier, email, expiry)
 - Pro/Team tier status
+- Per-secret access policies and rotation reminders
 
 ## Browser Extension
 
@@ -237,6 +238,8 @@ keyblind status               Show license and vault status
 keyblind audit                Show secret resolution audit log
 keyblind check --expired      List secrets past expiry
 keyblind rotate <name>        Update a secret value
+keyblind rotate <name> --generate  Rotate with an auto-generated value
+keyblind rotate --overdue [days]    Rotate all secrets past the threshold
 keyblind rotate-needed [days] List secrets not rotated in N days (default 90)
 keyblind policy set <secret> <policy>  Restrict which agents may access a secret
 keyblind policy list          List per-secret policies

@@ -6,7 +6,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { storeSecret, listSecrets, deleteSecret, resolveSecret, isInitialized, getAuditLog, setClientInfo } from "./vault.js";
+import { storeSecret, listSecrets, deleteSecret, resolveSecret, isInitialized, getAuditLog, setClientInfo, listRotationNeeded } from "./vault.js";
 import { getBackend } from "./backends.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { generateTOTPCode, storeTOTP, listTOTP, deleteTOTP, parseOTPAuthURI, getTOTP, type TOTPConfig } from "./totp.js";
@@ -17,7 +17,7 @@ import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { createHttpsServer, certExists, certExpiringSoon, provisionCert, startAutoRenewal, type ACMEOptions } from "./https.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
-import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets } from "./ledger.js";
+import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets, listSecretPolicies, setSecretPolicy, clearSecretPolicy } from "./ledger.js";
 import { getVersion } from "./version.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -988,6 +988,58 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ stored: name, generated: true }));
       } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
+      return;
+    }
+
+    // ── Policies & rotation REST API ──
+    if (req.url === "/api/policies" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ policies: listSecretPolicies() }));
+      return;
+    }
+
+    if (req.url === "/api/policies" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const { secret, policy } = JSON.parse(body);
+        if (!secret) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "secret required" })); return; }
+        setSecretPolicy(secret, policy || "");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ secret, policy: policy || "" }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid JSON" })); }
+      return;
+    }
+
+    if (req.url?.startsWith("/api/policies/") && req.method === "DELETE") {
+      const secret = decodeURIComponent(req.url.slice("/api/policies/".length));
+      clearSecretPolicy(secret);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ secret, cleared: true }));
+      return;
+    }
+
+    if (req.url?.startsWith("/api/rotate-needed") && req.method === "GET") {
+      if (!isInitialized()) { res.writeHead(500, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Not initialized" })); return; }
+      const url = new URL(req.url, `http://localhost:${port}`);
+      const days = parseInt(url.searchParams.get("days") || "90", 10);
+      const threshold = Number.isFinite(days) && days > 0 ? days : 90;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ reminders: listRotationNeeded(threshold) }));
+      return;
+    }
+
+    if (req.url === "/api/rotate" && req.method === "POST") {
+      if (!isInitialized()) { res.writeHead(500, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Not initialized" })); return; }
+      const body = await readBody(req);
+      try {
+        const { name, length, noSymbols } = JSON.parse(body);
+        if (!name) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "name required" })); return; }
+        if (resolveSecret(name) === null) { res.writeHead(404, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `Secret "${name}" not found` })); return; }
+        const value = generateSecret(length || 32, !noSymbols);
+        storeSecret(name, value);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ rotated: name }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid JSON" })); }
       return;
     }
 

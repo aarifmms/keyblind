@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Key, Shield, Clock, Users, FileText, Smartphone, Send, Skull, Bot } from "lucide-react";
+import { Key, Shield, Clock, Users, FileText, Smartphone, Send, Skull, Bot, Lock } from "lucide-react";
 import { KeyblindClient } from "@/lib/keyblind-client";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Shield },
   { href: "/secrets", label: "Secrets", icon: Key },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/policies", label: "Policies", icon: Lock },
   { href: "/totp", label: "TOTP", icon: Smartphone },
   { href: "/share", label: "Share", icon: Send },
   { href: "/deadman", label: "Dead Man", icon: Skull },

@@ -37,6 +37,7 @@ import {
   listRotationNeeded,
   getDb,
 } from "../src/vault.js";
+import { getSecretHistory, rollbackSecret } from "../src/sync.js";
 
 beforeAll(() => {
   // Create temp home so vault init doesn't fail on missing directory
@@ -129,6 +130,21 @@ describe("vault CRUD", () => {
     storeSecret("UPDATE_TEST", "old");
     storeSecret("UPDATE_TEST", "new");
     expect(resolveSecret("UPDATE_TEST")).toBe("new");
+  });
+
+  it("records history on update and supports rollback", () => {
+    storeSecret("HISTORY_TEST", "v1");
+    storeSecret("HISTORY_TEST", "v2");
+    storeSecret("HISTORY_TEST", "v3");
+
+    expect(resolveSecret("HISTORY_TEST")).toBe("v3");
+    const versions = getSecretHistory("HISTORY_TEST");
+    expect(versions.length).toBe(2); // v1 and v2 snapshotted, v3 is current
+    expect(versions[0].value).toBe("v2");
+    expect(versions[1].value).toBe("v1");
+
+    expect(rollbackSecret("HISTORY_TEST")).toBe(true);
+    expect(resolveSecret("HISTORY_TEST")).toBe("v2");
   });
 
   it("deletes a secret", () => {

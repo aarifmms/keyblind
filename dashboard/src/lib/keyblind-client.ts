@@ -159,6 +159,37 @@ export class KeyblindClient {
     return res.text();
   }
 
+  // Per-secret policies + rotation
+  async getPolicies(): Promise<{ secret: string; policy: string }[]> {
+    const result = await this.rest("/api/policies");
+    return result.policies || [];
+  }
+
+  async setPolicy(secret: string, policy: string): Promise<void> {
+    await this.rest("/api/policies", {
+      method: "POST",
+      body: JSON.stringify({ secret, policy }),
+    });
+  }
+
+  async clearPolicy(secret: string): Promise<void> {
+    await this.rest(`/api/policies/${encodeURIComponent(secret)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getRotationNeeded(days: number = 90): Promise<{ name: string; updatedAt: string; ageDays: number }[]> {
+    const result = await this.rest(`/api/rotate-needed?days=${days}`);
+    return result.reminders || [];
+  }
+
+  async rotateSecret(name: string, length?: number): Promise<void> {
+    await this.rest("/api/rotate", {
+      method: "POST",
+      body: JSON.stringify({ name, length }),
+    });
+  }
+
   // TOTP
   async getTOTPConfigs(): Promise<TOTPConfig[]> {
     const result = await this.rest("/api/totp");

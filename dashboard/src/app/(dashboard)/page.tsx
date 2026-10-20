@@ -7,6 +7,7 @@ export default function Home() {
   const [secretCount, setSecretCount] = useState<number | null>(null);
   const [status, setStatus] = useState<KeyblindStatus | null>(null);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [rotNeeded, setRotNeeded] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export default function Home() {
     client.getSecrets().then((s) => setSecretCount(s.length)).catch(() => setSecretCount(0));
     client.getStatus().then(setStatus).catch(() => {});
     client.getAuditLog(5).then(setRecentActivity).catch(() => setRecentActivity([]));
+    client.getRotationNeeded(90).then((r) => setRotNeeded(r.length)).catch(() => setRotNeeded(0));
   }, []);
 
   const tierLabel = status
@@ -28,7 +30,7 @@ export default function Home() {
   return (
     <div>
       <h1 className="text-xl font-semibold mb-6">Dashboard</h1>
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
           <p className="text-sm text-[#8b949e]">Secrets</p>
           <p className="text-2xl font-bold text-[#58a6ff]">{secretCount ?? "…"}</p>
@@ -36,6 +38,12 @@ export default function Home() {
         <div className="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
           <p className="text-sm text-[#8b949e]">License</p>
           <p className="text-lg font-bold text-[#3fb950]">{tierLabel}</p>
+        </div>
+        <div className="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
+          <p className="text-sm text-[#8b949e]">Needs rotation</p>
+          <p className={`text-lg font-bold ${(rotNeeded ?? 0) > 0 ? "text-[#f0883e]" : "text-[#3fb950]"}`}>
+            {rotNeeded ?? "…"}
+          </p>
         </div>
         <div className="bg-[#161b22] border border-[#21262d] rounded-lg p-4">
           <p className="text-sm text-[#8b949e]">Status</p>

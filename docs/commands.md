@@ -11,7 +11,9 @@
 | `keyblind list` | List all secret names |
 | `keyblind delete <name>` | Delete a secret |
 | `keyblind generate <name>` | Generate a strong random secret |
-| `keyblind rotate <name>` | Update a secret value |
+| `keyblind rotate <name>` | Update a secret value (prompts for new value) |
+| `keyblind rotate <name> --generate` | Rotate with an auto-generated random value |
+| `keyblind rotate --overdue [days]` | Rotate every secret past the threshold with generated values |
 | `keyblind rotate-needed [days]` | List secrets not rotated in N days (default 90) |
 
 ## MCP Setup

@@ -262,6 +262,20 @@ export function getDb(): Database.Database {
   _db.exec(`
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
   `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS secret_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      encrypted_value BLOB NOT NULL,
+      iv BLOB NOT NULL,
+      auth_tag BLOB NOT NULL,
+      version INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  _db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_secret_history_name ON secret_history(name);
+  `);
   for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
     try {
       if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
@@ -276,7 +290,7 @@ export function storeSecret(name: string, value: string): void {
   const db = getDb();
 
   // Check free tier limit (only for new secrets, not updates)
-  const existing = db.prepare("SELECT name FROM secrets WHERE name = ? AND name NOT LIKE '@_@_%' ESCAPE '@'").get(name) as { name: string } | undefined;
+  const existing = db.prepare("SELECT name, encrypted_value, iv, auth_tag FROM secrets WHERE name = ? AND name NOT LIKE '@_@_%' ESCAPE '@'").get(name) as { name: string; encrypted_value: Buffer; iv: Buffer; auth_tag: Buffer } | undefined;
   if (!existing) {
     const currentCount = (db.prepare("SELECT COUNT(*) as count FROM secrets WHERE name NOT LIKE '@_@_%' ESCAPE '@'").get() as { count: number }).count;
     const limit = getSecretLimit();
@@ -286,6 +300,13 @@ export function storeSecret(name: string, value: string): void {
         `Get a license at: https://keyblind.dev/pricing`
       );
     }
+  } else {
+    // Snapshot the current value into history before overwriting so every
+    // update (set/rotate/generate) is reversible via `keyblind rollback`.
+    const nextVersion = (db.prepare("SELECT MAX(version) as maxv FROM secret_history WHERE name = ?").get(name) as { maxv: number | null }).maxv ?? 0;
+    db.prepare("INSERT INTO secret_history (name, encrypted_value, iv, auth_tag, version) VALUES (?, ?, ?, ?, ?)").run(
+      name, existing.encrypted_value, existing.iv, existing.auth_tag, nextVersion + 1
+    );
   }
 
   const key = getKey();

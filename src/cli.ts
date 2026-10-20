@@ -67,6 +67,8 @@ Usage:
   keyblind audit               Show secret resolution audit log
   keyblind check --expired     List secrets past their expiry date
   keyblind rotate <name>       Update a secret (prompts for new value)
+  keyblind rotate <name> --generate  Rotate with an auto-generated random value
+  keyblind rotate --overdue [days]    Rotate all secrets past the threshold
   keyblind rotate-needed [days]  List secrets not rotated in N days (default 90)
   keyblind watch [.env]        Watch .env and auto-sandbox on change
   keyblind activate <key>      Activate a Keyblind Pro/Team license
@@ -781,23 +783,61 @@ async function main(): Promise<void> {
           console.error("Keyblind not initialized. Run: keyblind init");
           process.exit(1);
         }
+
+        // Batch mode: rotate every secret past the rotation threshold, auto-generating
+        // a fresh random value for each. Ideal for a cron job or CI schedule.
+        if (args[1] === "--overdue") {
+          const days = parseInt(args[2] ?? "90", 10);
+          const threshold = Number.isFinite(days) && days > 0 ? days : 90;
+          const overdue = listRotationNeeded(threshold);
+          if (overdue.length === 0) {
+            console.log(`No secrets not rotated in ${threshold}+ days.`);
+            break;
+          }
+          const lenIdx = args.indexOf("--len");
+          const length = lenIdx !== -1 ? parseInt(args[lenIdx + 1], 10) || 32 : 32;
+          const noSymbols = args.includes("--no-symbols");
+          for (const s of overdue) {
+            storeSecret(s.name, generateSecret(length, !noSymbols));
+          }
+          console.log(`Rotated ${overdue.length} secret${overdue.length === 1 ? "" : "s"} (generated new random values):`);
+          for (const s of overdue) {
+            console.log(`  ${s.name}  (retrieve with: keyblind get ${s.name})`);
+          }
+          break;
+        }
+
         const rotateName = args[1];
         if (!rotateName) {
-          console.error("Usage: keyblind rotate <name>");
+          console.error("Usage: keyblind rotate <name> [--generate] [--len N] [--no-symbols]");
+          console.error("       keyblind rotate --overdue [days] [--len N] [--no-symbols]");
           process.exit(1);
         }
-        const oldValue = resolveSecret(rotateName);
-        if (oldValue === null) {
+        if (resolveSecret(rotateName) === null) {
           console.error(`Secret "${rotateName}" not found.`);
           process.exit(1);
         }
-        const newValue = await readPassphrase(`Enter new value for ${rotateName}: `);
-        if (!newValue) {
-          console.error("No value provided.");
-          process.exit(1);
+
+        let newValue: string;
+        const generated = args.includes("--generate");
+        if (generated) {
+          const lenIdx = args.indexOf("--len");
+          const length = lenIdx !== -1 ? parseInt(args[lenIdx + 1], 10) || 32 : 32;
+          const noSymbols = args.includes("--no-symbols");
+          newValue = generateSecret(length, !noSymbols);
+        } else {
+          newValue = await readPassphrase(`Enter new value for ${rotateName}: `);
+          if (!newValue) {
+            console.error("No value provided.");
+            process.exit(1);
+          }
         }
+
         storeSecret(rotateName, newValue);
         console.log(`Rotated "${rotateName}"`);
+        if (generated) {
+          console.log(newValue);
+        }
         break;
       }
 
