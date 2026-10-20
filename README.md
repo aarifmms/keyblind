@@ -62,7 +62,7 @@ Keyblind is **MCP-first** — it works with every AI tool that speaks the Model 
 keyblind setup-mcp
 ```
 
-This auto-configures Claude Code to use Keyblind. Works from any directory. For other editors, see [editor-specific configs](docs/editors.md).
+This auto-configures Claude Code, Cline, and Zed to use Keyblind. Works from any directory. For other editors (Cursor, Copilot, Windsurf), see [editor-specific configs](docs/editors.md).
 
 ### Setup (manual)
 
@@ -242,7 +242,7 @@ keyblind set <name> -         Store a secret (prompts securely)
 keyblind get <name>           Resolve and print a secret
 keyblind list                 List all stored secrets
 keyblind delete <name>        Delete a secret
-keyblind setup-mcp            Auto-configure MCP for Claude Code
+keyblind setup-mcp            Auto-configure MCP for Claude Code, Cline, Zed
 keyblind sandbox [.env]       Replace .env with deterministic fakes
 keyblind unsandbox [.env]     Restore real .env values
 keyblind run <command...>     Run command with secrets as env vars

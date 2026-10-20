@@ -2,15 +2,15 @@
 
 Keyblind uses the MCP stdio transport — it works with any editor that speaks Model Context Protocol.
 
-## One-Command Setup (Claude Code)
+## One-Command Setup (Claude Code, Cline, Zed)
 
 ```bash
 keyblind setup-mcp
 ```
 
-This auto-configures Claude Code globally (`--scope user`). Works from any directory. Restart Claude Code and you're done.
+This auto-configures Claude Code, Cline, and Zed globally. Works from any directory. Restart your editor and you're done.
 
-Under the hood, it runs: `claude mcp add --scope user keyblind -- keyblind start`
+Under the hood, it runs `claude mcp add --scope user keyblind -- keyblind start` for Claude Code, and merges `keyblind` into `~/.cline/mcp_settings.json` and `~/.zed/settings.json` for Cline and Zed (only if those directories exist).
 
 ## Manual Setup for Other Editors
 
