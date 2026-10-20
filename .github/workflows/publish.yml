@@ -38,5 +38,11 @@ jobs:
       # `npm publish` runs `prepublishOnly`, which builds src/ and the dashboard
       # static export before packaging. `--provenance` attests the tarball was
       # built from this repo by this workflow.
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      #
+      # We publish to the `next` dist-tag (staged publishing), NOT `latest`. A
+      # human then promotes the release with:
+      #   npm dist-tag add keyblind@<version> latest
+      # This keeps `latest` human-gated (2FA) so a compromised repo cannot
+      # silently replace what `npm i -g keyblind` installs.
+      - name: Publish to npm (staged)
+        run: npm publish --provenance --access public --tag next
