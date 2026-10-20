@@ -240,6 +240,8 @@ keyblind rotate <name>        Update a secret value
 keyblind rotate-needed [days] List secrets not rotated in N days (default 90)
 keyblind policy set <secret> <policy>  Restrict which agents may access a secret
 keyblind policy list          List per-secret policies
+keyblind scan-repo [--all]    Scan tracked files (or full history) for secrets
+keyblind setup-ci             Write a GitHub Actions secret-scan workflow
 keyblind team init [path]     Create a shared team vault
 keyblind team push <name>     Push a secret to team vault
 keyblind team pull            Pull secrets from team vault

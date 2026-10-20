@@ -4,7 +4,7 @@ import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
 import { authenticateWithBiometric, biometricAvailable, createSession, sessionActive, clearSession } from "./auth.js";
-import { installHook, checkAndReport, getStagedFiles, scanFiles } from "./hook.js";
+import { installHook, checkAndReport, getStagedFiles, scanFiles, scanTrackedFiles, scanRepoHistory, setupCi } from "./hook.js";
 import { watchEnvFile } from "./watch.js";
 import { teamInit, teamPush, teamPull, teamList, teamDelete } from "./team.js";
 import { activateLicense, deactivateLicense, getLicenseInfo, isPro, featuresEnabled } from "./license.js";
@@ -61,6 +61,8 @@ Usage:
   keyblind dashboard           Open the local dashboard (http://localhost:4318)
   keyblind check-secrets       Scan staged files for secrets (used by hook)
   keyblind scan-secrets <file...>  Scan specific files for secrets
+  keyblind scan-repo [--all]   Scan tracked files (or full history) for secrets
+  keyblind setup-ci            Write a GitHub Actions secret-scan workflow
   keyblind backend <name>      Switch active secret backend
   keyblind audit               Show secret resolution audit log
   keyblind check --expired     List secrets past their expiry date
@@ -441,6 +443,29 @@ async function main(): Promise<void> {
             console.log(`${f.file}:${f.line} [${f.pattern}] ${f.match}`);
           }
         }
+        break;
+      }
+
+      case "scan-repo": {
+        const all = args.includes("--all");
+        const findings = all ? scanRepoHistory() : scanTrackedFiles();
+        if (findings.length === 0) {
+          console.log(all ? "No secrets found in git history." : "No secrets found in tracked files.");
+        } else {
+          for (const f of findings) {
+            const loc = f.commit ? `${f.commit} ${f.file}:${f.line}` : `${f.file}:${f.line}`;
+            console.log(`${loc} [${f.pattern}] ${f.match}`);
+          }
+          console.log(`\n${findings.length} potential secret(s) detected.`);
+          process.exit(1);
+        }
+        break;
+      }
+
+      case "setup-ci": {
+        const workflowPath = setupCi();
+        console.log(`Wrote ${workflowPath}`);
+        console.log("Commit it and GitHub Actions will run `keyblind scan-repo` on every push and pull request.");
         break;
       }
 

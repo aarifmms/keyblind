@@ -138,6 +138,22 @@ keyblind policy list                              # List all per-secret policies
 Both must pass for an action to be authorized. An empty policy means no per-secret
 restriction — the agent's own scope alone applies.
 
+## Secret Scanning / CI
+
+```bash
+keyblind check-secrets             # Scan staged files (run by the pre-commit hook)
+keyblind scan-secrets <file...>    # Scan specific files
+keyblind scan-repo                 # Scan all tracked files in the current repo
+keyblind scan-repo --all           # Scan the full git history (slower, opt-in)
+keyblind install-hook              # Install a pre-commit hook that blocks secret commits
+keyblind setup-ci                  # Write .github/workflows/keyblind.yml
+```
+
+`scan-repo` exits non-zero when it finds a secret, so it fails a CI build. `setup-ci`
+generates a GitHub Actions workflow that runs `npx keyblind scan-repo` on every push and
+pull request, giving you an enforcement backstop beyond the (bypassable) pre-commit hook.
+Test files (`*.test.*`, `tests/`) are skipped by default.
+
 ## License
 
 ```bash

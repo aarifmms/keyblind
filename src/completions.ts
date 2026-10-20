@@ -1,8 +1,8 @@
 const COMMANDS = [
   "init", "set", "get", "list", "delete",
   "sandbox", "unsandbox", "run", "start", "watch",
-  "backends", "backend", "install-hook", "check-secrets", "scan-secrets",
-  "audit", "check", "rotate",
+  "backends", "backend", "install-hook", "check-secrets", "scan-secrets", "scan-repo", "setup-ci",
+  "audit", "check", "rotate", "rotate-needed", "policy",
   "activate", "deactivate", "status",
   "team", "generate", "import", "export", "doctor",
   "completions", "config",
