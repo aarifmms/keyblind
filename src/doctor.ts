@@ -2,6 +2,7 @@ import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret } from 
 import { getBackend, listAvailableBackends } from "./backends.js";
 import { getLicenseInfo, getSecretLimit } from "./license.js";
 import { readConfig } from "./config.js";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
@@ -134,6 +135,81 @@ export function runDoctor(): CheckResult[] {
     }
   } else {
     checks.push({ name: ".env safety", status: "ok", detail: "No .env file in current directory" });
+  }
+
+  // 10. Backup safety — key material must not leak into backups or git
+  if (isInitialized()) {
+    checks.push(...backupSafetyChecks());
+  }
+
+  return checks;
+}
+
+// --- Backup safety ---
+
+const SENSITIVE_VAULT_FILES = new Set(["vault.db", ".keyblind.key"]);
+
+export function gitTrackedSensitiveFiles(dir: string = process.cwd()): string[] {
+  try {
+    const out = execFileSync("git", ["ls-files"], {
+      cwd: dir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: 3000,
+    });
+    return out
+      .split("\n")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0 && SENSITIVE_VAULT_FILES.has(path.basename(f)));
+  } catch {
+    // Not a git repository, or git unavailable.
+    return [];
+  }
+}
+
+function dirInsideGit(dir: string): boolean {
+  let cur = dir;
+  for (;;) {
+    if (fs.existsSync(path.join(cur, ".git"))) return true;
+    const parent = path.dirname(cur);
+    if (parent === cur) return false;
+    cur = parent;
+  }
+}
+
+export function backupSafetyChecks(): CheckResult[] {
+  const checks: CheckResult[] = [];
+  const vaultDir = path.join(os.homedir(), ".keyblind");
+
+  if (fs.existsSync(path.join(vaultDir, ".keyblind.key"))) {
+    checks.push({
+      name: "Key storage",
+      status: "warn",
+      detail: "Master key is in a plaintext file (~/.keyblind/.keyblind.key). Backing up ~/.keyblind/ would copy the key alongside the vault.",
+    });
+  } else {
+    checks.push({
+      name: "Key storage",
+      status: "ok",
+      detail: "Master key is in the OS keyring (no plaintext key file)",
+    });
+  }
+
+  if (dirInsideGit(vaultDir)) {
+    checks.push({
+      name: "Vault in git repo",
+      status: "warn",
+      detail: "~/.keyblind/ is inside a git working tree. Add it to .gitignore so the vault is never committed.",
+    });
+  }
+
+  const tracked = gitTrackedSensitiveFiles();
+  if (tracked.length > 0) {
+    checks.push({
+      name: "Git-tracked vault files",
+      status: "warn",
+      detail: `Tracked by git: ${tracked.join(", ")}. Run: git rm --cached ${tracked.join(" ")}`,
+    });
   }
 
   return checks;
