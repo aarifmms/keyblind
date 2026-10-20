@@ -80,7 +80,7 @@ describe("keychain", () => {
 
     execMock.mockReturnValueOnce(Buffer.from(""));
     expect(keychainAvailable()).toBe(true);
-    expect(execMock).toHaveBeenCalledWith("secret-tool", ["--version"], expect.anything());
+    expect(execMock).toHaveBeenCalledWith("sh", ["-c", "command -v secret-tool"], expect.anything());
 
     execMock.mockReturnValueOnce("stored\n");
     expect(keychainGet("default")).toBe("stored");

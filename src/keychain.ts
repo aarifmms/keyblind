@@ -151,8 +151,10 @@ export function keychainAvailable(): boolean {
     }
   }
   if (process.platform === "linux") {
+    // `secret-tool` has no --version flag (it exits 2 for any help/version
+    // probe), so presence is detected via `command -v`.
     try {
-      execFileSync("secret-tool", ["--version"], { stdio: "ignore", timeout: 3000 });
+      execFileSync("sh", ["-c", "command -v secret-tool"], { stdio: "ignore", timeout: 3000 });
       return true;
     } catch {
       return false;
