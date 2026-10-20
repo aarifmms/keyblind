@@ -36,6 +36,19 @@ async function readPassphrase(prompt: string): Promise<string> {
   return promptSecret(prompt);
 }
 
+// Run an external command to produce a rotated secret value. `{}` in the
+// command is replaced with the secret name; otherwise the name is appended as
+// the final argument. The command's stdout (trimmed) is the new value.
+function runRotationCommand(cmd: string, name: string): string {
+  const full = cmd.includes("{}") ? cmd.replaceAll("{}", name) : `${cmd} ${name}`;
+  const out = execSync(full, { encoding: "utf-8", timeout: 60_000 }).trim();
+  if (!out) {
+    console.error(`Rotation command produced no output for "${name}": ${full}`);
+    process.exit(1);
+  }
+  return out;
+}
+
 function printHelp(): void {
   console.log(`
 🔑 Keyblind — Blind AI to your keys
@@ -72,6 +85,7 @@ Usage:
   keyblind check --expired     List secrets past their expiry date
   keyblind rotate <name>       Update a secret (prompts for new value)
   keyblind rotate <name> --generate  Rotate with an auto-generated random value
+  keyblind rotate <name> --exec "<cmd>"  Rotate using an external command's stdout
   keyblind rotate --overdue [days]    Rotate all secrets past the threshold
   keyblind rotate-needed [days]  List secrets not rotated in N days (default 90)
   keyblind watch [.env]        Watch .env and auto-sandbox on change
@@ -863,8 +877,16 @@ async function main(): Promise<void> {
           process.exit(1);
         }
 
-        // Batch mode: rotate every secret past the rotation threshold, auto-generating
-        // a fresh random value for each. Ideal for a cron job or CI schedule.
+        const execIdx = args.indexOf("--exec");
+        const execCmd = execIdx !== -1 ? args[execIdx + 1] : undefined;
+        if (execIdx !== -1 && !execCmd) {
+          console.error('Usage: keyblind rotate <name> --exec "<command>"');
+          process.exit(1);
+        }
+
+        // Batch mode: rotate every secret past the rotation threshold, either by
+        // auto-generating a fresh random value or by running the --exec command
+        // per secret. Ideal for a cron job or CI schedule.
         if (args[1] === "--overdue") {
           const days = parseInt(args[2] ?? "90", 10);
           const threshold = Number.isFinite(days) && days > 0 ? days : 90;
@@ -877,9 +899,9 @@ async function main(): Promise<void> {
           const length = lenIdx !== -1 ? parseInt(args[lenIdx + 1], 10) || 32 : 32;
           const noSymbols = args.includes("--no-symbols");
           for (const s of overdue) {
-            storeSecret(s.name, generateSecret(length, !noSymbols));
+            storeSecret(s.name, execCmd ? runRotationCommand(execCmd, s.name) : generateSecret(length, !noSymbols));
           }
-          console.log(`Rotated ${overdue.length} secret${overdue.length === 1 ? "" : "s"} (generated new random values):`);
+          console.log(`Rotated ${overdue.length} secret${overdue.length === 1 ? "" : "s"} (${execCmd ? "via --exec" : "generated new random values"}):`);
           for (const s of overdue) {
             console.log(`  ${s.name}  (retrieve with: keyblind get ${s.name})`);
           }
@@ -888,8 +910,8 @@ async function main(): Promise<void> {
 
         const rotateName = args[1];
         if (!rotateName) {
-          console.error("Usage: keyblind rotate <name> [--generate] [--len N] [--no-symbols]");
-          console.error("       keyblind rotate --overdue [days] [--len N] [--no-symbols]");
+          console.error("Usage: keyblind rotate <name> [--generate] [--exec \"<command>\"] [--len N] [--no-symbols]");
+          console.error("       keyblind rotate --overdue [days] [--len N] [--no-symbols] [--exec \"<command>\"]");
           process.exit(1);
         }
         if (resolveSecret(rotateName) === null) {
@@ -899,7 +921,13 @@ async function main(): Promise<void> {
 
         let newValue: string;
         const generated = args.includes("--generate");
-        if (generated) {
+        if (generated && execCmd) {
+          console.error("Use either --generate or --exec, not both.");
+          process.exit(1);
+        }
+        if (execCmd) {
+          newValue = runRotationCommand(execCmd, rotateName);
+        } else if (generated) {
           const lenIdx = args.indexOf("--len");
           const length = lenIdx !== -1 ? parseInt(args[lenIdx + 1], 10) || 32 : 32;
           const noSymbols = args.includes("--no-symbols");
@@ -914,7 +942,7 @@ async function main(): Promise<void> {
 
         storeSecret(rotateName, newValue);
         console.log(`Rotated "${rotateName}"`);
-        if (generated) {
+        if (generated || execCmd) {
           console.log(newValue);
         }
         break;

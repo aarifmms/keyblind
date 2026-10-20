@@ -239,6 +239,7 @@ keyblind audit                Show secret resolution audit log
 keyblind check --expired      List secrets past expiry
 keyblind rotate <name>        Update a secret value
 keyblind rotate <name> --generate  Rotate with an auto-generated value
+keyblind rotate <name> --exec "<cmd>"  Rotate via an external command's stdout
 keyblind rotate --overdue [days]    Rotate all secrets past the threshold
 keyblind rotate-needed [days] List secrets not rotated in N days (default 90)
 keyblind policy set <secret> <policy>  Restrict which agents may access a secret

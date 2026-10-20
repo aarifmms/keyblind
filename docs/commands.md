@@ -13,8 +13,21 @@
 | `keyblind generate <name>` | Generate a strong random secret |
 | `keyblind rotate <name>` | Update a secret value (prompts for new value) |
 | `keyblind rotate <name> --generate` | Rotate with an auto-generated random value |
+| `keyblind rotate <name> --exec "<cmd>"` | Rotate using an external command's stdout (works with every backend) |
 | `keyblind rotate --overdue [days]` | Rotate every secret past the threshold with generated values |
 | `keyblind rotate-needed [days]` | List secrets not rotated in N days (default 90) |
+
+`--exec "<cmd>"` runs an external command to produce the new value, so rotation
+works with **every backend** (AWS, GCP, Azure, 1Password, Bitwarden, or a custom
+script) without Keyblind knowing provider specifics. `{}` in the command is
+replaced with the secret name; if omitted, the name is appended as the last
+argument. The command's trimmed stdout becomes the new value.
+
+```bash
+keyblind rotate DATABASE_URL --exec "aws secretsmanager rotate-secret --secret-id {}"
+keyblind rotate API_KEY --exec "./scripts/new-key.sh"
+keyblind rotate --overdue 30 --exec "gcloud secrets versions add {} --data-file=-"
+```
 
 ## MCP Setup
 
