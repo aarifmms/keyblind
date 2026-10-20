@@ -22,8 +22,11 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - name: Upgrade npm (staged publishing needs >= 11.15.0)
-        run: npm install -g npm@latest
+      - name: Upgrade npm to 11.x (staged publishing needs >= 11.15.0)
+        # Pin to 11.x, NOT `latest`: npm 12 enforces install-script blocking
+        # (allowScripts defaults off), which skips better-sqlite3's and
+        # esbuild's build scripts and breaks the test/build steps.
+        run: npm install -g npm@11
 
       - name: Install root dependencies
         run: npm ci
