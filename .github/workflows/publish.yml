@@ -19,8 +19,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm (staged publishing needs >= 11.15.0)
+        run: npm install -g npm@latest
 
       - name: Install root dependencies
         run: npm ci
@@ -35,14 +38,15 @@ jobs:
           KEYBLIND_DEV: "true"
           KEYBLIND_PUBLIC_KEY: MCowBQYDK2VwAyEApW1Wgu2bKF4KN3pafAbYC2203SRyf9qdlITawyj9jJk=
 
-      # `npm publish` runs `prepublishOnly`, which builds src/ and the dashboard
-      # static export before packaging. `--provenance` attests the tarball was
-      # built from this repo by this workflow.
+      # `npm stage publish` runs `prepublishOnly`, which builds src/ and the
+      # dashboard static export before packaging. `--provenance` attests the
+      # tarball was built from this repo by this workflow.
       #
-      # We publish to the `next` dist-tag (staged publishing), NOT `latest`. A
-      # human then promotes the release with:
-      #   npm dist-tag add keyblind@<version> latest
-      # This keeps `latest` human-gated (2FA) so a compromised repo cannot
-      # silently replace what `npm i -g keyblind` installs.
-      - name: Publish to npm (staged)
-        run: npm publish --provenance --access public --tag next
+      # The trusted publisher is configured for *staged publishing*: it can only
+      # `npm stage publish`, never publish directly to `latest`. A human with
+      # 2FA then approves the staged tarball (npm web UI, or `npm stage approve
+      # <stage-id>`), which promotes it to `latest`. This keeps `latest`
+      # human-gated so a compromised repo cannot silently replace what
+      # `npm i -g keyblind` installs.
+      - name: Stage publish to npm (2FA-gated)
+        run: npm stage publish --provenance --access public
