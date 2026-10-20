@@ -1,8 +1,11 @@
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 export interface SetupResult {
   editor: string;
-  action: "configured" | "already_configured" | "failed";
+  action: "configured" | "already_configured" | "skipped" | "failed";
   error?: string;
 }
 
@@ -13,6 +16,60 @@ function hasCommand(cmd: string): boolean {
   } catch {
     return false;
   }
+}
+
+function dirExists(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+interface ServerEntry {
+  command: string;
+  args: string[];
+}
+
+// Merge a keyblind MCP server entry into an editor's JSON config file.
+// Reads-and-merges (never overwrites); a missing file starts empty and a
+// malformed file is left untouched (returned as an error) so user data is
+// never clobbered.
+export function mergeMcpServer(
+  filePath: string,
+  configKey: string,
+  entry: ServerEntry
+): { configured: boolean; already: boolean; error?: string } {
+  let config: any = {};
+  if (fs.existsSync(filePath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        config = parsed;
+      }
+    } catch {
+      return { configured: false, already: false, error: `could not parse ${filePath}` };
+    }
+  }
+
+  const existing = config[configKey];
+  const servers =
+    existing && typeof existing === "object" && !Array.isArray(existing) ? existing : {};
+  if (servers.keyblind) {
+    return { configured: false, already: true };
+  }
+  servers.keyblind = entry;
+  config[configKey] = servers;
+
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    const tmp = `${filePath}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + "\n");
+    fs.renameSync(tmp, filePath);
+  } catch (err: any) {
+    return { configured: false, already: false, error: err.message };
+  }
+  return { configured: true, already: false };
 }
 
 function setupClaudeCode(): SetupResult {
@@ -41,6 +98,36 @@ function setupClaudeCode(): SetupResult {
   }
 }
 
+function setupCline(): SetupResult {
+  const dir = path.join(os.homedir(), ".cline");
+  if (!dirExists(dir)) {
+    return { editor: "Cline", action: "skipped", error: "~/.cline not found" };
+  }
+  const result = mergeMcpServer(
+    path.join(dir, "mcp_settings.json"),
+    "mcpServers",
+    { command: "keyblind", args: ["start"] }
+  );
+  if (result.error) return { editor: "Cline", action: "failed", error: result.error };
+  if (result.already) return { editor: "Cline", action: "already_configured" };
+  return { editor: "Cline", action: "configured" };
+}
+
+function setupZed(): SetupResult {
+  const dir = path.join(os.homedir(), ".zed");
+  if (!dirExists(dir)) {
+    return { editor: "Zed", action: "skipped", error: "~/.zed not found" };
+  }
+  const result = mergeMcpServer(
+    path.join(dir, "settings.json"),
+    "mcp_servers",
+    { command: "keyblind", args: ["start"] }
+  );
+  if (result.error) return { editor: "Zed", action: "failed", error: result.error };
+  if (result.already) return { editor: "Zed", action: "already_configured" };
+  return { editor: "Zed", action: "configured" };
+}
+
 export function setupAll(): SetupResult[] {
-  return [setupClaudeCode()];
+  return [setupClaudeCode(), setupCline(), setupZed()];
 }

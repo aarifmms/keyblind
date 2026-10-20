@@ -238,6 +238,8 @@ function runSetupMcp(): void {
       console.log(`✓ ${r.editor}: MCP server configured`);
     } else if (r.action === "already_configured") {
       console.log(`✓ ${r.editor}: already configured`);
+    } else if (r.action === "skipped") {
+      console.log(`  ${r.editor}: skipped (${r.error})`);
     } else {
       console.error(`✗ ${r.editor}: ${r.error}`);
     }
@@ -414,7 +416,7 @@ async function main(): Promise<void> {
 
       case "setup-mcp": {
         runSetupMcp();
-        console.log("\nRestart Claude Code, then try: 'list my keyblind secrets'");
+        console.log("\nRestart your editor, then try: 'list my keyblind secrets'");
         break;
       }
 
@@ -425,7 +427,7 @@ async function main(): Promise<void> {
           console.log("\nFound ./.env. Run `keyblind sandbox` to replace real values with fakes for AI agents.");
         }
         console.log("\nDone. Next steps:");
-        console.log("  1. Restart Claude Code to load the MCP server");
+        console.log("  1. Restart your editor to load the MCP server");
         console.log('  2. Store your first secret:  echo "sk-..." | keyblind set OPENAI_API_KEY');
         console.log('  3. Try it: "list my keyblind secrets"');
         break;
