@@ -124,7 +124,7 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 
 The **Keyblind Chrome Extension** detects and blocks secrets from being pasted into AI chat interfaces (Claude.ai, ChatGPT, Copilot).
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Coming_Soon-blue)]()
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/ljobkicejnncijfmnkkedpgngbaalnmd?label=Chrome%20Web%20Store&color=4285F4)](https://chromewebstore.google.com/detail/keyblind-%E2%80%94-blind-ai-to-yo/ljobkicejnncijfmnkkedpgngbaalnmd)
 
 Features:
 - Detects 12+ API key formats (OpenAI, GitHub, Stripe, AWS, etc.)

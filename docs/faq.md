@@ -61,7 +61,7 @@ Run `keyblind backends` to see which backends are available.
 
 ## Is there a browser extension?
 
-Yes. The Keyblind browser extension detects API keys in your clipboard and warns before pasting into AI chat sites (Claude.ai, ChatGPT, GitHub Copilot web). Available in the Chrome Web Store.
+Yes. The Keyblind browser extension detects API keys in your clipboard and warns before pasting into AI chat sites (Claude.ai, ChatGPT, GitHub Copilot web). [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/keyblind-%E2%80%94-blind-ai-to-yo/ljobkicejnncijfmnkkedpgngbaalnmd).
 
 ## Can I use Keyblind with non-MCP tools?
 

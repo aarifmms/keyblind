@@ -1,5 +1,8 @@
 # Chrome Web Store Listing — Keyblind
 
+> **Status: Published — public** (approved Oct 19 2026)
+> Live: https://chromewebstore.google.com/detail/keyblind-%E2%80%94-blind-ai-to-yo/ljobkicejnncijfmnkkedpgngbaalnmd
+
 ---
 
 ## Store Listing Fields
