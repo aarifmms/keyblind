@@ -18,6 +18,12 @@ import {
   authorizeAction,
   isAgentScopeRequired,
   setAgentScopeRequirement,
+  policyMatches,
+  setSecretPolicy,
+  clearSecretPolicy,
+  getSecretPolicy,
+  listSecretPolicies,
+  filterReadableSecrets,
 } from "../src/ledger.js";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ledger-test-"));
@@ -131,5 +137,56 @@ describe("agent ledger", () => {
     expect(isAgentScopeRequired()).toBe(true);
     setAgentScopeRequirement(false);
     expect(isAgentScopeRequired()).toBe(false);
+  });
+});
+
+describe("per-secret access policies", () => {
+  it("matches policy grammar over agent names", () => {
+    expect(policyMatches("*", "read", "any-agent")).toBe(true);
+    expect(policyMatches("read:billing-*", "read", "billing-1")).toBe(true);
+    expect(policyMatches("read:billing-*", "read", "web-1")).toBe(false);
+    expect(policyMatches("read:billing-*", "write", "billing-1")).toBe(false);
+    expect(policyMatches("write:admin read:*", "read", "web-1")).toBe(true);
+    expect(policyMatches("read:web-* write:*", "write", "billing-1")).toBe(true);
+    expect(policyMatches("", "read", "any-agent")).toBe(false);
+  });
+
+  it("sets, lists, and clears per-secret policies", () => {
+    setSecretPolicy("DB_PASSWORD", "read:billing-*");
+    expect(getSecretPolicy("DB_PASSWORD")).toBe("read:billing-*");
+    expect(getSecretPolicy("UNPOLICIED")).toBe("");
+    expect(listSecretPolicies()).toEqual([{ secret: "DB_PASSWORD", policy: "read:billing-*" }]);
+
+    setSecretPolicy("DB_PASSWORD", "");
+    expect(getSecretPolicy("DB_PASSWORD")).toBe("");
+    expect(listSecretPolicies()).toEqual([]);
+
+    setSecretPolicy("API_KEY", "read:*");
+    clearSecretPolicy("API_KEY");
+    expect(listSecretPolicies()).toEqual([]);
+  });
+
+  it("enforces a per-secret policy on top of agent scope", () => {
+    const billing = registerAgent("billing-1", "sponsor@corp.com", "read:*");
+    const other = registerAgent("other-1", "sponsor@corp.com", "read:*");
+    setSecretPolicy("DB_PASSWORD", "read:billing-*");
+
+    const billingSig = signRequest(billing.privateKey, "read", "DB_PASSWORD");
+    expect(authorizeAction(billing.identity.id, "read", "DB_PASSWORD", billingSig)).toBeNull();
+
+    const otherSig = signRequest(other.privateKey, "read", "DB_PASSWORD");
+    expect(authorizeAction(other.identity.id, "read", "DB_PASSWORD", otherSig)).toMatch(/per-secret policy/);
+  });
+
+  it("filters list_secrets to readable secrets by scope and policy", () => {
+    const web = registerAgent("web-1", "sponsor@corp.com", "read:prod-*");
+    setSecretPolicy("prod-db", "read:web-*");
+    setSecretPolicy("prod-api", "read:billing-*");
+    const secrets = ["prod-db", "prod-api", "prod-cache", "dev-db"];
+    expect(filterReadableSecrets(web.identity.id, secrets)).toEqual(["prod-db", "prod-cache"]);
+  });
+
+  it("returns empty for an unknown agent", () => {
+    expect(filterReadableSecrets("nonexistent", ["a", "b"])).toEqual([]);
   });
 });

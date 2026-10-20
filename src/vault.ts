@@ -402,6 +402,28 @@ export function checkExpired(): string[] {
   return expired;
 }
 
+export interface RotationReminder {
+  name: string;
+  updatedAt: string;
+  ageDays: number;
+}
+
+export function listRotationNeeded(daysThreshold: number = 90): RotationReminder[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT name, updated_at FROM secrets WHERE name NOT LIKE '@_@_%' ESCAPE '@'").all() as { name: string; updated_at: string }[];
+  const now = Date.now();
+  const reminders: RotationReminder[] = [];
+  for (const r of rows) {
+    const updated = Date.parse(r.updated_at.replace(" ", "T") + "Z");
+    if (isNaN(updated)) continue;
+    const ageDays = Math.floor((now - updated) / (24 * 60 * 60 * 1000));
+    if (ageDays >= daysThreshold) {
+      reminders.push({ name: r.name, updatedAt: r.updated_at, ageDays });
+    }
+  }
+  return reminders.sort((a, b) => b.ageDays - a.ageDays);
+}
+
 export function closeDb(): void {
   if (_db) {
     _db.close();

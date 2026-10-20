@@ -17,7 +17,7 @@ import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { createHttpsServer, certExists, certExpiringSoon, provisionCert, startAutoRenewal, type ACMEOptions } from "./https.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
-import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired } from "./ledger.js";
+import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets } from "./ledger.js";
 import { getVersion } from "./version.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -217,8 +217,9 @@ export function createServer(): McpServer {
       }
 
       const names = listSecrets().filter((n) => !n.startsWith("_keyblind") && !n.startsWith("_totp") && !n.startsWith("__keyblind"));
+      const visible = agentId ? filterReadableSecrets(agentId, names) : names;
       return {
-        content: [{ type: "text", text: JSON.stringify({ secrets: names }) }],
+        content: [{ type: "text", text: JSON.stringify({ secrets: visible }) }],
       };
     },
   );

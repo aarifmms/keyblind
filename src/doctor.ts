@@ -1,4 +1,4 @@
-import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret } from "./vault.js";
+import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret, listRotationNeeded } from "./vault.js";
 import { getBackend, listAvailableBackends } from "./backends.js";
 import { getLicenseInfo, getSecretLimit } from "./license.js";
 import { readConfig } from "./config.js";
@@ -140,6 +140,22 @@ export function runDoctor(): CheckResult[] {
   // 10. Backup safety — key material must not leak into backups or git
   if (isInitialized()) {
     checks.push(...backupSafetyChecks());
+  }
+
+  // 11. Secret rotation — surface secrets that have not been rotated in 90 days
+  if (isInitialized()) {
+    try {
+      const stale = listRotationNeeded(90);
+      if (stale.length === 0) {
+        checks.push({ name: "Secret rotation", status: "ok", detail: "No secrets older than 90 days" });
+      } else {
+        const oldest = stale.slice(0, 5).map((s) => `${s.name} (${s.ageDays}d)`).join(", ");
+        const more = stale.length > 5 ? ` +${stale.length - 5} more` : "";
+        checks.push({ name: "Secret rotation", status: "warn", detail: `${stale.length} secret${stale.length === 1 ? "" : "s"} not rotated in 90+ days: ${oldest}${more}. Run: keyblind rotate <name>` });
+      }
+    } catch {
+      checks.push({ name: "Secret rotation", status: "ok", detail: "Could not check rotation age" });
+    }
   }
 
   return checks;

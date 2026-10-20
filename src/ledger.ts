@@ -87,6 +87,12 @@ function getDb(): Database.Database {
     )
   `);
   _db.exec(`CREATE INDEX IF NOT EXISTS idx_ledger_agent ON ledger(agent_id)`);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS secret_policies (
+      secret TEXT PRIMARY KEY,
+      policy TEXT NOT NULL DEFAULT ''
+    )
+  `);
   return _db;
 }
 
@@ -191,12 +197,83 @@ export function verifyAgentSignature(agentId: string, action: string, target: st
 // Checks an agent's scope and returns a deny reason, or null if allowed.
 // Verifies the signature before consulting the scope, so an invalid signature
 // is indistinguishable from a valid-but-out-of-scope one at the call site.
+// A per-secret policy (when set) is an additional gate layered on top of the
+// agent's own scope: the agent must satisfy both.
 export function authorizeAction(agentId: string, action: "read" | "write", target: string, signatureB64: string): string | null {
   const agent = getAgent(agentId);
   if (!agent) return "Unknown agent";
   if (!verifyAgentSignature(agentId, action, target, signatureB64)) return "Invalid agent signature";
   if (!scopeMatches(agent.scope, action, target)) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
+  const policy = getSecretPolicy(target);
+  if (policy !== "" && !policyMatches(policy, action, agent.name)) {
+    return `Denied by per-secret policy for "${target}"`;
+  }
   return null;
+}
+
+// ── Per-secret access policies ────────────────────────────────────────────────
+//
+// A policy is attached to a single secret and constrains *which agents* (matched
+// by name) may act on it, independently of each agent's own broad scope. Grammar:
+//   policy     := permission (whitespace | ',' | ';')* permission*
+//   permission := "*" | action ":" glob
+//   action     := "read" | "write" | "*"
+//   glob       := shell-style wildcard over agent NAMES
+//
+// Examples: "*", "read:billing-* write:admin", "read:web-* write:*".
+// An empty policy ("") means no per-secret restriction — fall back to agent scope.
+
+export function policyMatches(policy: string, action: "read" | "write", agentName: string): boolean {
+  for (const perm of policy.split(/[\s,;]+/)) {
+    const p = perm.trim();
+    if (!p) continue;
+    if (p === "*") return true;
+    const idx = p.indexOf(":");
+    if (idx === -1) continue;
+    const permAction = p.slice(0, idx);
+    const pattern = p.slice(idx + 1);
+    if (permAction !== action && permAction !== "*") continue;
+    if (pattern === "*" || globMatch(pattern, agentName)) return true;
+  }
+  return false;
+}
+
+export function setSecretPolicy(secret: string, policy: string): void {
+  const db = getDb();
+  if (policy.trim() === "") {
+    db.prepare("DELETE FROM secret_policies WHERE secret = ?").run(secret);
+  } else {
+    db.prepare("INSERT INTO secret_policies (secret, policy) VALUES (?, ?) ON CONFLICT(secret) DO UPDATE SET policy = excluded.policy").run(secret, policy);
+  }
+}
+
+export function clearSecretPolicy(secret: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM secret_policies WHERE secret = ?").run(secret);
+}
+
+export function getSecretPolicy(secret: string): string {
+  const db = getDb();
+  const row = db.prepare("SELECT policy FROM secret_policies WHERE secret = ?").get(secret) as { policy: string } | undefined;
+  return row?.policy ?? "";
+}
+
+export function listSecretPolicies(): { secret: string; policy: string }[] {
+  const db = getDb();
+  return db.prepare("SELECT secret, policy FROM secret_policies ORDER BY secret").all() as { secret: string; policy: string }[];
+}
+
+// Returns the subset of `secrets` this agent may read, considering both its
+// scope and any per-secret policies. Used to filter `list_secrets` results.
+export function filterReadableSecrets(agentId: string, secrets: string[]): string[] {
+  const agent = getAgent(agentId);
+  if (!agent) return [];
+  return secrets.filter((name) => {
+    if (!scopeMatches(agent.scope, "read", name)) return false;
+    const policy = getSecretPolicy(name);
+    if (policy !== "" && !policyMatches(policy, "read", agent.name)) return false;
+    return true;
+  });
 }
 
 // ── Mandatory enforcement flag ───────────────────────────────────────────────

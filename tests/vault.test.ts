@@ -34,6 +34,8 @@ import {
   isInitialized,
   closeDb,
   rotateMasterKey,
+  listRotationNeeded,
+  getDb,
 } from "../src/vault.js";
 
 beforeAll(() => {
@@ -158,5 +160,24 @@ describe("master key rotation", () => {
 
     storeSecret("ROTATE_TEST_2", "post-rotate");
     expect(resolveSecret("ROTATE_TEST_2")).toBe("post-rotate");
+  });
+});
+
+describe("rotation reminders", () => {
+  beforeAll(() => {
+    if (!isInitialized()) initializeVault("test-passphrase");
+  });
+
+  it("flags secrets not rotated in N days", () => {
+    storeSecret("ROTATION_STALE", "x");
+    storeSecret("ROTATION_FRESH", "y");
+
+    const staleDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 19).replace("T", " ");
+    getDb().prepare("UPDATE secrets SET updated_at = ? WHERE name = ?").run(staleDate, "ROTATION_STALE");
+
+    const stale = listRotationNeeded(90);
+    expect(stale.map((s) => s.name)).toContain("ROTATION_STALE");
+    expect(stale.map((s) => s.name)).not.toContain("ROTATION_FRESH");
   });
 });

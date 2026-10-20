@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo } from "./vault.js";
+import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded } from "./vault.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -18,7 +18,7 @@ import { createShareLink, receiveShare } from "./share.js";
 import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger } from "./deadman.js";
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll } from "./setup-mcp.js";
-import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement } from "./ledger.js";
+import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies } from "./ledger.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import readline from "node:readline";
@@ -65,6 +65,7 @@ Usage:
   keyblind audit               Show secret resolution audit log
   keyblind check --expired     List secrets past their expiry date
   keyblind rotate <name>       Update a secret (prompts for new value)
+  keyblind rotate-needed [days]  List secrets not rotated in N days (default 90)
   keyblind watch [.env]        Watch .env and auto-sandbox on change
   keyblind activate <key>      Activate a Keyblind Pro/Team license
   keyblind deactivate          Deactivate and remove current license
@@ -75,6 +76,9 @@ Usage:
   keyblind agents verify       Verify agent ledger integrity
   keyblind agents export [json|csv]  Export compliance report
   keyblind agents enforce on|off  Require signed agent identity for secret access
+  keyblind policy set <secret> <policy>  Restrict which agents may read/write a secret
+  keyblind policy clear <secret>    Remove a secret's per-secret policy
+  keyblind policy list              List all per-secret policies
   keyblind team init [path]    Create a shared team vault (git-safe)
   keyblind team push <name>     Push a local secret to the team vault
   keyblind team pull            Import all team secrets to local vault
@@ -658,6 +662,53 @@ async function main(): Promise<void> {
         break;
       }
 
+      case "policy": {
+        const sub = args[1];
+        if (!sub) {
+          console.error("Usage: keyblind policy <set|clear|list>");
+          process.exit(1);
+        }
+        switch (sub) {
+          case "set": {
+            const secret = args[2];
+            const policy = args.slice(3).join(" ");
+            if (!secret) {
+              console.error("Usage: keyblind policy set <secret> <policy>");
+              console.error('  policy examples: "*", "read:billing-* write:admin", "read:*"');
+              process.exit(1);
+            }
+            setSecretPolicy(secret, policy);
+            console.log(policy.trim() ? `Policy set for "${secret}": ${policy}` : `Policy cleared for "${secret}"`);
+            break;
+          }
+          case "clear": {
+            const secret = args[2];
+            if (!secret) {
+              console.error("Usage: keyblind policy clear <secret>");
+              process.exit(1);
+            }
+            clearSecretPolicy(secret);
+            console.log(`Policy cleared for "${secret}"`);
+            break;
+          }
+          case "list": {
+            const policies = listSecretPolicies();
+            if (policies.length === 0) {
+              console.log("No per-secret policies set.");
+            } else {
+              for (const p of policies) {
+                console.log(`  ${p.secret.padEnd(24)} ${p.policy}`);
+              }
+            }
+            break;
+          }
+          default:
+            console.error("Usage: keyblind policy <set|clear|list>");
+            process.exit(1);
+        }
+        break;
+      }
+
       case "audit": {
         requirePro();
         if (!isInitialized()) {
@@ -722,6 +773,26 @@ async function main(): Promise<void> {
         }
         storeSecret(rotateName, newValue);
         console.log(`Rotated "${rotateName}"`);
+        break;
+      }
+
+      case "rotate-needed": {
+        if (!isInitialized()) {
+          console.error("Keyblind not initialized. Run: keyblind init");
+          process.exit(1);
+        }
+        const days = parseInt(args[1] ?? "90", 10);
+        const threshold = Number.isFinite(days) && days > 0 ? days : 90;
+        const stale = listRotationNeeded(threshold);
+        if (stale.length === 0) {
+          console.log(`No secrets not rotated in ${threshold}+ days.`);
+        } else {
+          console.log(`Secrets not rotated in ${threshold}+ days:`);
+          for (const s of stale) {
+            console.log(`  ${s.name.padEnd(24)} ${s.ageDays}d (updated ${s.updatedAt})`);
+          }
+          console.log(`\nRotate with: keyblind rotate <name>`);
+        }
         break;
       }
 
