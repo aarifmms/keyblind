@@ -19,6 +19,7 @@ import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTr
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll } from "./setup-mcp.js";
 import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies } from "./ledger.js";
+import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
 import readline from "node:readline";
@@ -63,6 +64,9 @@ Usage:
   keyblind scan-secrets <file...>  Scan specific files for secrets
   keyblind scan-repo [--all]   Scan tracked files (or full history) for secrets
   keyblind setup-ci            Write a GitHub Actions secret-scan workflow
+  keyblind ci export           Export an encrypted bundle for CI injection
+  keyblind ci inject           Decrypt a bundle and write secrets to $GITHUB_ENV
+  keyblind ci setup            Write a GitHub Actions workflow for CI injection
   keyblind backend <name>      Switch active secret backend
   keyblind audit               Show secret resolution audit log
   keyblind check --expired     List secrets past their expiry date
@@ -468,6 +472,81 @@ async function main(): Promise<void> {
         const workflowPath = setupCi();
         console.log(`Wrote ${workflowPath}`);
         console.log("Commit it and GitHub Actions will run `keyblind scan-repo` on every push and pull request.");
+        break;
+      }
+
+      case "ci": {
+        requirePro();
+        const sub = args[1];
+        const flag = (name: string): string | undefined => {
+          const i = args.indexOf(name);
+          return i !== -1 ? args[i + 1] : undefined;
+        };
+
+        switch (sub) {
+          case "export": {
+            if (!isInitialized()) {
+              console.error("Keyblind not initialized. Run: keyblind init");
+              process.exit(1);
+            }
+            const passphrase = flag("--passphrase") ?? process.env.KEYBLIND_CI_PASSPHRASE ?? await readPassphrase("Enter a passphrase to encrypt the CI bundle: ");
+            if (!passphrase) {
+              console.error("No passphrase provided.");
+              process.exit(1);
+            }
+            const secrets = listSecrets()
+              .map((name) => ({ name, value: resolveSecret(name) }))
+              .filter((s): s is { name: string; value: string } => s.value !== null && !s.value.includes("\0"));
+            const bundle = createCiBundle(passphrase, secrets);
+            const out = flag("--out");
+            if (out) {
+              fs.writeFileSync(out, bundle, { mode: 0o600 });
+              console.log(`Wrote encrypted CI bundle to ${out}`);
+            } else {
+              console.log(bundle);
+            }
+            break;
+          }
+
+          case "inject": {
+            const bundle = flag("--bundle") ?? process.env.KEYBLIND_CI_BUNDLE;
+            const passphrase = flag("--passphrase") ?? process.env.KEYBLIND_CI_PASSPHRASE;
+            if (!bundle) {
+              console.error("No bundle. Provide --bundle <bundle> or set KEYBLIND_CI_BUNDLE.");
+              process.exit(1);
+            }
+            if (!passphrase) {
+              console.error("No passphrase. Provide --passphrase <p> or set KEYBLIND_CI_PASSPHRASE.");
+              process.exit(1);
+            }
+            let secrets: { name: string; value: string }[];
+            try {
+              secrets = parseCiBundle(bundle, passphrase);
+            } catch (err: any) {
+              console.error(err.message);
+              process.exit(1);
+            }
+            const output = renderEnvFile(secrets);
+            const out = flag("--out") ?? process.env.GITHUB_ENV;
+            if (out) {
+              fs.writeFileSync(out, output, { mode: 0o600 });
+            } else {
+              process.stdout.write(output);
+            }
+            break;
+          }
+
+          case "setup": {
+            const workflowPath = setupCiInjection();
+            console.log(`Wrote ${workflowPath}`);
+            console.log("Add your build steps, then set the KEYBLIND_CI_BUNDLE and KEYBLIND_CI_PASSPHRASE repo secrets.");
+            break;
+          }
+
+          default:
+            console.error("Usage: keyblind ci <export|inject|setup>");
+            process.exit(1);
+        }
         break;
       }
 

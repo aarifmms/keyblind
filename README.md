@@ -245,6 +245,9 @@ keyblind policy set <secret> <policy>  Restrict which agents may access a secret
 keyblind policy list          List per-secret policies
 keyblind scan-repo [--all]    Scan tracked files (or full history) for secrets
 keyblind setup-ci             Write a GitHub Actions secret-scan workflow
+keyblind ci export            Export an encrypted bundle for CI injection (Pro)
+keyblind ci inject            Decrypt a bundle and write secrets to $GITHUB_ENV
+keyblind ci setup             Write a GitHub Actions workflow for CI injection
 keyblind team init [path]     Create a shared team vault
 keyblind team push <name>     Push a secret to team vault
 keyblind team pull            Pull secrets from team vault

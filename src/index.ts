@@ -18,3 +18,4 @@ export { provisionCert, createHttpsServer, startAutoRenewal, certExists, certExp
 export { configureSSO, ssoLogin, ssoLogout, getSSOToken, isSSOAuthenticated, getSSOConfig, type SSOConfig, type SSOToken, type IDTokenClaims } from "./sso.js";
 export { setupAll, type SetupResult } from "./setup-mcp.js";
 export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, scopeMatches, signRequest, verifyAgentSignature, authorizeAction, isAgentScopeRequired, setAgentScopeRequirement, policyMatches, setSecretPolicy, clearSecretPolicy, getSecretPolicy, listSecretPolicies, filterReadableSecrets, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";
+export { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection, type CiSecret } from "./ci.js";
