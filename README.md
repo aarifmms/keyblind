@@ -213,6 +213,28 @@ keyblind backend bitwarden                 # Switch to Bitwarden
 - **Vault stored at `~/.keyblind/`** with `0700` permissions
 - **Deterministic sandbox fakes** using HMAC-SHA256 per project + key name
 
+## Verifying Your Install
+
+Releases are built and published from GitHub Actions with npm provenance, which
+attests the tarball was produced from this repository's CI rather than a
+developer machine.
+
+```bash
+npm audit signatures        # Verify npm registry signatures
+```
+
+To verify build provenance for a release, open the release page at
+https://github.com/aarifmms/keyblind/releases and check the "Provenance" and
+"Attestations" sections, which link the tarball to the exact commit and workflow
+run that built it.
+
+- **Small dependency graph** — the CLI depends on four packages only (MCP SDK,
+  acme-client, better-sqlite3, zod). Server-only deps (Stripe, Resend, the Vercel
+  CLI) live in the `hosted/` and `dashboard/` packages and are not installed by
+  `npm i -g keyblind`.
+- **No source maps** — the published tarball ships compiled JavaScript with no
+  embedded original source.
+
 ## CLI Reference
 
 ```

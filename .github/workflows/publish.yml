@@ -1,0 +1,42 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # required for npm provenance (OIDC trusted publishing)
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm ci
+        working-directory: dashboard
+
+      - name: Test
+        run: npm test
+        env:
+          KEYBLIND_DEV: "true"
+          KEYBLIND_PUBLIC_KEY: MCowBQYDK2VwAyEApW1Wgu2bKF4KN3pafAbYC2203SRyf9qdlITawyj9jJk=
+
+      # `npm publish` runs `prepublishOnly`, which builds src/ and the dashboard
+      # static export before packaging. `--provenance` attests the tarball was
+      # built from this repo by this workflow.
+      - name: Publish to npm
+        run: npm publish --provenance --access public

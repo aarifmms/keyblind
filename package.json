@@ -38,13 +38,13 @@
     "type": "git",
     "url": "git+https://github.com/aarifmms/keyblind.git"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "acme-client": "^5.4.0",
     "better-sqlite3": "^11.0.0",
-    "resend": "^6.12.4",
-    "stripe": "^22.2.0",
-    "vercel": "^54.5.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
