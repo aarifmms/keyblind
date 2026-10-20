@@ -228,9 +228,9 @@ https://github.com/aarifmms/keyblind/releases and check the "Provenance" and
 "Attestations" sections, which link the tarball to the exact commit and workflow
 run that built it.
 
-- **Small dependency graph** — the CLI depends on four packages only (MCP SDK,
-  acme-client, better-sqlite3, zod). Server-only deps (Stripe, Resend, the Vercel
-  CLI) live in the `hosted/` and `dashboard/` packages and are not installed by
+- **Small dependency graph** — the CLI depends on three packages only (MCP SDK,
+  better-sqlite3, zod). Server-only deps (Stripe, Resend, the Vercel CLI) live in
+  the `hosted/` and `dashboard/` packages and are not installed by
   `npm i -g keyblind`.
 - **No source maps** — the published tarball ships compiled JavaScript with no
   embedded original source.

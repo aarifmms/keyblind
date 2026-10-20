@@ -98,8 +98,6 @@ keyblind start --http           # HTTP server on port 4318 (dashboard + MCP + RE
 keyblind dashboard              # Open the web dashboard in your browser (localhost:4318)
 keyblind start --http --port 4000
 keyblind start --biometric      # Require Touch ID before resolving secrets
-keyblind start --http --https --domain example.com --email admin@example.com
-keyblind start --http --https --domain example.com --staging  # Test Let's Encrypt
 ```
 
 ## Run with Secrets

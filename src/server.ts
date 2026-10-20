@@ -14,7 +14,6 @@ import { createShareLink, receiveShare } from "./share.js";
 import { getDeadmanStatus, checkin } from "./deadman.js";
 import { getLicenseInfo, isPro, featuresEnabled, getSecretLimit } from "./license.js";
 import { getSSOToken, isSSOAuthenticated } from "./sso.js";
-import { createHttpsServer, certExists, certExpiringSoon, provisionCert, startAutoRenewal, type ACMEOptions } from "./https.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
 import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets, listSecretPolicies, setSecretPolicy, clearSecretPolicy } from "./ledger.js";
@@ -681,7 +680,7 @@ export async function startServer(): Promise<void> {
   await server.connect(transport);
 }
 
-export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOptions, host: string = "127.0.0.1"): Promise<void> {
+export async function startHttpServer(port: number = 4318, host: string = "127.0.0.1"): Promise<void> {
   const mcpServer = createServer();
 
   // Single transport instance handles all requests with session management
@@ -1058,29 +1057,6 @@ export async function startHttpServer(port: number = 4318, httpsConfig?: ACMEOpt
     res.writeHead(404);
     res.end("Not found");
   };
-
-  if (httpsConfig) {
-    // HTTPS mode with Let's Encrypt
-    if (!certExists(httpsConfig.domain) || certExpiringSoon(httpsConfig.domain)) {
-      console.log(`[keyblind] Provisioning Let's Encrypt certificate for ${httpsConfig.domain}...`);
-      await provisionCert(httpsConfig);
-    }
-    startAutoRenewal(httpsConfig.domain, httpsConfig.email);
-
-    const { httpsServer, httpServer } = createHttpsServer(appHandler, httpsConfig);
-
-    return new Promise((resolve) => {
-      httpServer.listen(httpsConfig.httpPort || 80, () => {
-        console.log(`HTTP redirect listening on port ${httpsConfig.httpPort || 80}`);
-      });
-      httpsServer.listen(httpsConfig.port || 443, () => {
-        console.log(`Keyblind MCP HTTPS server listening on https://${httpsConfig.domain}:${httpsConfig.port || 443}`);
-        console.log(`  MCP endpoint: https://${httpsConfig.domain}/mcp`);
-        console.log(`  Health:       https://${httpsConfig.domain}/health`);
-        resolve();
-      });
-    });
-  }
 
   const httpServer = http.createServer(appHandler);
 

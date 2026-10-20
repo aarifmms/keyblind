@@ -14,7 +14,6 @@ export { configureAlerts, loadAlertsFromConfig, fireAlert, formatSlackPayload, f
 export { storeTOTP, getTOTP, listTOTP, deleteTOTP, generateTOTPCode, generateTOTP, generateHOTP, parseOTPAuthURI, timeRemaining, type TOTPConfig } from "./totp.js";
 export { createShareLink, receiveShare, parseTTL, type SharePayload } from "./share.js";
 export { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger, encryptKeyShard, getDeadmanConfig, type DeadmanConfig, type DeadmanStatus } from "./deadman.js";
-export { provisionCert, createHttpsServer, startAutoRenewal, certExists, certExpiringSoon, type ACMEOptions, type CertPaths } from "./https.js";
 export { configureSSO, ssoLogin, ssoLogout, getSSOToken, isSSOAuthenticated, getSSOConfig, type SSOConfig, type SSOToken, type IDTokenClaims } from "./sso.js";
 export { setupAll, type SetupResult } from "./setup-mcp.js";
 export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, scopeMatches, signRequest, verifyAgentSignature, authorizeAction, isAgentScopeRequired, setAgentScopeRequirement, policyMatches, setSecretPolicy, clearSecretPolicy, getSecretPolicy, listSecretPolicies, filterReadableSecrets, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";

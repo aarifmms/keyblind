@@ -138,8 +138,6 @@ Usage:
   keyblind sso login          Authenticate via browser SSO flow
   keyblind sso logout         Clear SSO session
   keyblind sso status         Show SSO authentication status
-  keyblind start --http --https --domain example.com   HTTPS with Let's Encrypt
-  keyblind start --http --https --domain example.com --staging   Test with staging
   keyblind help                Show this help
 
 Global flags:
@@ -436,7 +434,7 @@ async function main(): Promise<void> {
           try { execSync(`${openCmd} "${url}"`); } catch { /* user can open manually */ }
         }, 600);
         console.log(`Opening dashboard at ${url}`);
-        await startHttpServer(port, undefined, host);
+        await startHttpServer(port, host);
         break;
       }
 
@@ -1050,12 +1048,6 @@ async function main(): Promise<void> {
         }
         const biometric = args.includes("--biometric");
         const httpMode = args.includes("--http");
-        const httpsMode = args.includes("--https");
-        const domainIdx = args.indexOf("--domain");
-        const domain = domainIdx !== -1 ? args[domainIdx + 1] : undefined;
-        const emailIdx = args.indexOf("--email");
-        const email = emailIdx !== -1 ? args[emailIdx + 1] : undefined;
-        const staging = args.includes("--staging");
         if (biometric) {
           requirePro();
           if (!biometricAvailable()) {
@@ -1070,25 +1062,15 @@ async function main(): Promise<void> {
           console.log("Biometric gate enabled — session expires in 15 minutes.");
         }
         getKey();
-        if (httpsMode) {
-          requirePro();
-          if (!domain) {
-            console.error("HTTPS mode requires --domain <your-domain.com>");
-            console.error("Example: keyblind start --http --https --domain keyblind.example.com --email admin@example.com");
-            process.exit(1);
-          }
-          const portIdx = args.indexOf("--port");
-          const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 443;
-          await startHttpServer(port, { domain, email, staging, port });
-        } else if (httpMode) {
+        if (httpMode) {
           const portIdx = args.indexOf("--port");
           const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 4318;
           const host = args.includes("--lan") ? "0.0.0.0" : "127.0.0.1";
-          await startHttpServer(port, undefined, host);
+          await startHttpServer(port, host);
         } else {
           // MCP stdio transport uses stdout — startup messages MUST go to stderr
           console.error("Keyblind MCP server started (stdio transport).");
-          console.error("For HTTP/HTTPS (browser dashboard), use: keyblind start --http");
+          console.error("For HTTP (browser dashboard), use: keyblind start --http");
           await startServer();
         }
         break;

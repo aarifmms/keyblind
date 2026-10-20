@@ -182,14 +182,7 @@ When no OS keyring is available (e.g. Linux without a running Secret Service), K
 ### MCP Transport
 
 - **Stdio transport**: Local process communication. No network exposure.
-- **HTTP transport** (`keyblind start --http`): Plain HTTP on localhost by default. No TLS for local development. Use `--https --domain example.com` for remote access with Let's Encrypt auto-provisioning.
-
-### HTTPS (Let's Encrypt)
-
-- ACME HTTP-01 challenge for domain validation
-- Auto-renewal 30 days before expiry (checked every 24h)
-- Self-signed fallback if provisioning fails
-- HTTP→HTTPS redirect on port 80
+- **HTTP transport** (`keyblind start --http`): Plain HTTP on localhost by default. No TLS. For remote access, terminate TLS with a reverse proxy (Caddy, nginx, or `certbot`) in front of `keyblind start --http`.
 
 ## Attack Surface Analysis
 
@@ -203,7 +196,7 @@ When no OS keyring is available (e.g. Linux without a running Secret Service), K
 | Share link intercepted | **LOW-MED** | Fragment never sent to server. But link can be intercepted via browser history or phishing |
 | Replay of old share links | **LOW** | TTL + expiry enforcement |
 | Memory dump of running process | **MEDIUM** | Plaintext/key buffers are zeroed after use; DEK is zeroed on `keyblind lock`. But the resolved JS string cannot be wiped. Mitigate with shorter session lifetimes |
-| Dependency compromise | **MEDIUM** | Only 3 runtime deps (better-sqlite3, stripe, resend) + stdlib crypto |
+| Dependency compromise | **MEDIUM** | Only 3 runtime deps (@modelcontextprotocol/sdk, better-sqlite3, zod) + stdlib crypto |
 
 ## Recommendations for Production Deployments
 
@@ -212,7 +205,7 @@ When no OS keyring is available (e.g. Linux without a running Secret Service), K
 3. **Never commit `.keyblind/`** to version control
 4. **Use `keyblind sandbox`** for all projects that interact with AI tools
 5. **Rotate the master key** (`keyblind rotate-key`) after suspected key exposure or to invalidate old vault backups
-6. **Enable HTTPS** for remote MCP access (`keyblind start --https --domain X`)
+6. **Terminate TLS with a reverse proxy** (Caddy, nginx, or `certbot`) in front of `keyblind start --http` for remote MCP access
 7. **Set up dead man's switch** for team vault passphrase recovery
 
 ## Cryptographic Inventory

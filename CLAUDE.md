@@ -23,7 +23,6 @@ src/
 ├── totp.ts         → TOTP/HOTP 2FA code generation (zero deps)
 ├── share.ts        → Encrypted secret sharing via URL fragments
 ├── deadman.ts      → Dead man's switch with email notification
-├── https.ts        → Let's Encrypt HTTPS for MCP server
 ├── sso.ts          → SSO/OIDC authentication for team vaults
 ├── setup-mcp.ts    → Auto-configure MCP for Claude Code (`keyblind setup-mcp`)
 ├── auth.ts         → Biometric authentication gate
