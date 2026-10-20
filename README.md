@@ -30,30 +30,27 @@ AI agents read your `.env` files. They copy-paste secrets into conversations. Th
 # 1. Install
 npm i -g keyblind
 
-# 2. Initialize your vault
-keyblind init
+# 2. One-command setup (initialize vault + configure Claude Code)
+keyblind quickstart
 
-# 3. Auto-configure MCP for Claude Code (one command)
-keyblind setup-mcp
-
-# 4. Store secrets
+# 3. Store secrets
 echo "sk-proj-abc123" | keyblind set OPENAI_API_KEY
 keyblind set DATABASE_URL -    # prompts securely
 
-# 5. Sandbox your .env (AI agents see fakes)
+# 4. Sandbox your .env (AI agents see fakes)
 keyblind sandbox
 
-# 6. Resolve a secret
+# 5. Resolve a secret
 keyblind get OPENAI_API_KEY
 
-# 7. Run commands with secrets injected as env vars
+# 6. Run commands with secrets injected as env vars
 keyblind run -- npm start
 
-# 8. List all secrets (names only, values hidden)
+# 7. List all secrets (names only, values hidden)
 keyblind list
 ```
 
-> **That's it.** After `keyblind setup-mcp`, restart Claude Code. Then just say _"list my keyblind secrets"_ or _"use my OPENAI_API_KEY"_ — the AI agent resolves secrets at runtime without ever seeing them in the transcript.
+> **That's it.** After `keyblind quickstart`, restart Claude Code. Then just say _"list my keyblind secrets"_ or _"use my OPENAI_API_KEY"_ — the AI agent resolves secrets at runtime without ever seeing them in the transcript.
 
 ## MCP Server
 
@@ -238,6 +235,7 @@ run that built it.
 ## CLI Reference
 
 ```
+keyblind quickstart           One-command setup (init + configure Claude Code)
 keyblind init                 Initialize the encrypted vault
 keyblind set <name>           Store a secret (value from stdin)
 keyblind set <name> -         Store a secret (prompts securely)

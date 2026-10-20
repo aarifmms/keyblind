@@ -54,6 +54,7 @@ function printHelp(): void {
 🔑 Keyblind — Blind AI to your keys
 
 Usage:
+  keyblind quickstart          One-command setup: init + configure Claude Code
   keyblind init                Initialize the encrypted vault
   keyblind set <name>          Store a secret (value read from stdin)
   keyblind set <name> -        Store a secret (prompts securely)
@@ -71,7 +72,7 @@ Usage:
   keyblind unsandbox [.env]    Restore real env values from vault
   keyblind backends            List available secret backends
   keyblind install-hook        Install pre-commit hook to detect secrets
-  keyblind setup-mcp           Configure MCP server for Claude Code & other editors
+  keyblind setup-mcp           Configure MCP server for Claude Code
   keyblind dashboard           Open the local dashboard (http://localhost:4318)
   keyblind check-secrets       Scan staged files for secrets (used by hook)
   keyblind scan-secrets <file...>  Scan specific files for secrets
@@ -144,6 +145,7 @@ Global flags:
   --project <name>            Use a project-specific vault (isolated per project)
 
 Examples:
+  keyblind quickstart
   keyblind init
   echo "sk-abc123" | keyblind set OPENAI_API_KEY
   keyblind set DATABASE_URL -
@@ -215,6 +217,33 @@ function requirePro(): void {
   }
 }
 
+async function initVaultInteractive(): Promise<void> {
+  const projectLabel = getProjectName() ? ` [project: ${getProjectName()}]` : "";
+  if (isInitialized()) {
+    console.log(`Keyblind is already initialized${projectLabel}. To reset, delete ~/.keyblind/${getProjectName() ? `projects/${getProjectName()}/` : ""}`);
+    return;
+  }
+  console.log(`🔑 Initializing Keyblind vault${projectLabel}...`);
+  const passphrase = await readPassphrase("Enter vault passphrase (or empty for machine-only key): ");
+  initializeVault(passphrase);
+  getKey(); // Verify key works
+  console.log("Keyblind vault created at ~/.keyblind/");
+  console.log("Configure Claude Code with: keyblind setup-mcp");
+}
+
+function runSetupMcp(): void {
+  const results = setupAll();
+  for (const r of results) {
+    if (r.action === "configured") {
+      console.log(`✓ ${r.editor}: MCP server configured`);
+    } else if (r.action === "already_configured") {
+      console.log(`✓ ${r.editor}: already configured`);
+    } else {
+      console.error(`✗ ${r.editor}: ${r.error}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
 
@@ -235,29 +264,9 @@ async function main(): Promise<void> {
   }
 
   try {
-    const projectLabel = getProjectName() ? ` [project: ${getProjectName()}]` : "";
-
     switch (command) {
       case "init": {
-        if (isInitialized()) {
-          console.log(`Keyblind is already initialized${projectLabel}. To reset, delete ~/.keyblind/${getProjectName() ? `projects/${getProjectName()}/` : ""}`);
-          return;
-        }
-        console.log(`🔑 Initializing Keyblind vault${projectLabel}...`);
-        const passphrase = await readPassphrase("Enter vault passphrase (or empty for machine-only key): ");
-        initializeVault(passphrase);
-        getKey(); // Verify key works
-        console.log("Keyblind vault created at ~/.keyblind/");
-        console.log("Add this to your Claude Code config (~/.claude/settings.json):");
-        console.log(`
-  {
-    "mcpServers": {
-      "keyblind": {
-        "command": "npx",
-        "args": ["keyblind", "start"]
-      }
-    }
-  }`);
+        await initVaultInteractive();
         break;
       }
 
@@ -404,17 +413,21 @@ async function main(): Promise<void> {
       }
 
       case "setup-mcp": {
-        const results = setupAll();
-        for (const r of results) {
-          if (r.action === "configured") {
-            console.log(`${r.editor}: MCP server configured successfully.`);
-          } else if (r.action === "already_configured") {
-            console.log(`${r.editor}: Already configured.`);
-          } else {
-            console.error(`${r.editor}: Failed — ${r.error}`);
-          }
-        }
+        runSetupMcp();
         console.log("\nRestart Claude Code, then try: 'list my keyblind secrets'");
+        break;
+      }
+
+      case "quickstart": {
+        await initVaultInteractive();
+        runSetupMcp();
+        if (fs.existsSync(".env")) {
+          console.log("\nFound ./.env. Run `keyblind sandbox` to replace real values with fakes for AI agents.");
+        }
+        console.log("\nDone. Next steps:");
+        console.log("  1. Restart Claude Code to load the MCP server");
+        console.log('  2. Store your first secret:  echo "sk-..." | keyblind set OPENAI_API_KEY');
+        console.log('  3. Try it: "list my keyblind secrets"');
         break;
       }
 
