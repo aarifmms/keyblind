@@ -237,6 +237,9 @@ keyblind status               Show license and vault status
 keyblind audit                Show secret resolution audit log
 keyblind check --expired      List secrets past expiry
 keyblind rotate <name>        Update a secret value
+keyblind rotate-needed [days] List secrets not rotated in N days (default 90)
+keyblind policy set <secret> <policy>  Restrict which agents may access a secret
+keyblind policy list          List per-secret policies
 keyblind team init [path]     Create a shared team vault
 keyblind team push <name>     Push a secret to team vault
 keyblind team pull            Pull secrets from team vault

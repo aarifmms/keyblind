@@ -12,6 +12,7 @@
 | `keyblind delete <name>` | Delete a secret |
 | `keyblind generate <name>` | Generate a strong random secret |
 | `keyblind rotate <name>` | Update a secret value |
+| `keyblind rotate-needed [days]` | List secrets not rotated in N days (default 90) |
 
 ## MCP Setup
 
@@ -118,6 +119,24 @@ keyblind team push <name>       # Push to team vault
 keyblind team pull              # Pull from team vault
 keyblind team list              # List team secrets
 ```
+
+## Know Your Agent (agent scope + policies)
+
+```bash
+keyblind agents list                              # List registered agents
+keyblind agents register <name> <sponsor> [scope] # Register an agent (prints its signing key)
+keyblind agents verify                            # Verify the ledger's hash chain + signatures
+keyblind agents export [json|csv]                 # Compliance report with sponsor attribution
+keyblind agents enforce on|off                    # Require signed agent identity for secret access
+keyblind policy set <secret> <policy>             # Restrict which agents may read/write a secret
+keyblind policy clear <secret>                    # Remove a secret's per-secret policy
+keyblind policy list                              # List all per-secret policies
+```
+
+`scope` grants an agent broad access (`*`, `read:prod-* write:prod-*`). A per-secret
+`policy` further constrains a single secret by **agent name** (`read:billing-*`, `*`).
+Both must pass for an action to be authorized. An empty policy means no per-secret
+restriction — the agent's own scope alone applies.
 
 ## License
 
