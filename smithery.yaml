@@ -1,2 +1,2 @@
-runtime: typescript
-entrypoint: dist/cli.js start
+name: keyblind
+target: local
