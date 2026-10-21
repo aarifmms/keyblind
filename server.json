@@ -3,7 +3,7 @@
   "name": "io.github.aarifmms/keyblind",
   "title": "Keyblind",
   "version": "0.8.8",
-  "description": "Encrypted secrets vault for AI agents. 27 MCP tools resolve secrets at runtime, so plaintext never touches the LLM transcript. One command configures every editor.",
+  "description": "Encrypted secrets vault for AI agents. 27 MCP tools resolve secrets at runtime, never leaking them.",
   "websiteUrl": "https://keyblind.dev",
   "repository": {
     "url": "https://github.com/aarifmms/keyblind",

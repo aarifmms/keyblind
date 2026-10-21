@@ -1,10 +1,15 @@
 {
-  "mcpb_version": "0.1",
+  "manifest_version": "0.4",
   "name": "keyblind",
+  "display_name": "Keyblind",
   "version": "0.8.8",
   "description": "Encrypted secrets vault that prevents API keys from leaking to AI conversations. AES-256-GCM encrypted storage with MCP runtime resolution, so plaintext never touches the LLM transcript.",
   "author": {
     "name": "Keyblind",
+    "url": "https://github.com/aarifmms/keyblind"
+  },
+  "repository": {
+    "type": "git",
     "url": "https://github.com/aarifmms/keyblind"
   },
   "homepage": "https://keyblind.dev",
@@ -17,39 +22,51 @@
       "args": ["${__dirname}/dist/cli.js", "start"]
     }
   },
-  "categories": ["security", "developer-tools"],
-  "tags": ["secrets", "encryption", "vault", "api-keys", "sandbox", "mcp", "team-vaults", "totp", "deadman", "agent-ledger"],
+  "keywords": [
+    "secrets",
+    "encryption",
+    "vault",
+    "api-keys",
+    "sandbox",
+    "mcp",
+    "team-vaults",
+    "totp",
+    "deadman",
+    "agent-ledger"
+  ],
   "tools": [
-    "resolve_secret",
-    "store_secret",
-    "list_secrets",
-    "sandbox_env",
-    "unsandbox_env",
-    "delete_secret",
-    "audit_log",
-    "totp_code",
-    "totp_store",
-    "totp_list",
-    "totp_delete",
-    "create_share_link",
-    "receive_share",
-    "deadman_status",
-    "deadman_checkin",
-    "team_init",
-    "team_push",
-    "team_pull",
-    "team_list",
-    "team_resolve",
-    "team_delete",
-    "sso_status",
-    "register_agent",
-    "record_action",
-    "verify_ledger",
-    "list_agents",
-    "export_compliance"
+    { "name": "resolve_secret", "description": "Resolve a secret at runtime (value hidden from transcript)" },
+    { "name": "store_secret", "description": "Encrypt and store a secret" },
+    { "name": "list_secrets", "description": "List secret names (values never revealed)" },
+    { "name": "delete_secret", "description": "Delete a secret" },
+    { "name": "sandbox_env", "description": "Replace .env values with deterministic fakes" },
+    { "name": "unsandbox_env", "description": "Restore real .env values from vault" },
+    { "name": "audit_log", "description": "View secret resolution audit trail" },
+    { "name": "totp_code", "description": "Generate a TOTP 2FA code for a stored config" },
+    { "name": "totp_store", "description": "Store a TOTP configuration from otpauth:// URI" },
+    { "name": "totp_list", "description": "List all stored TOTP configurations" },
+    { "name": "totp_delete", "description": "Delete a TOTP configuration" },
+    { "name": "create_share_link", "description": "Create encrypted, expiring share link for a secret" },
+    { "name": "receive_share", "description": "Receive and decrypt a shared secret" },
+    { "name": "deadman_status", "description": "Check dead man's switch status" },
+    { "name": "deadman_checkin", "description": "Reset dead man's switch timer" },
+    { "name": "team_init", "description": "Create a shared team vault (encrypted SQLite)" },
+    { "name": "team_push", "description": "Push a local secret to the team vault" },
+    { "name": "team_pull", "description": "Import all secrets from the team vault" },
+    { "name": "team_list", "description": "List secret names in the team vault" },
+    { "name": "team_resolve", "description": "Resolve (decrypt) a secret from the team vault" },
+    { "name": "team_delete", "description": "Delete a secret from the team vault" },
+    { "name": "sso_status", "description": "Check SSO/OIDC authentication status" },
+    { "name": "register_agent", "description": "Register an AI agent bound to a human sponsor" },
+    { "name": "record_action", "description": "Append a signed action to the tamper-proof ledger" },
+    { "name": "verify_ledger", "description": "Verify ledger integrity (hash chain + signatures)" },
+    { "name": "list_agents", "description": "List registered AI agents" },
+    { "name": "export_compliance", "description": "Export the agent ledger as a compliance report" }
   ],
   "compatibility": {
-    "platforms": ["macos", "linux", "windows"],
-    "node": ">=18.0.0"
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
   }
 }
