@@ -15,7 +15,7 @@
 ```
 src/
 ├── vault.ts        → AES-256-GCM encryption + SQLite store
-├── server.ts       → MCP server (16 tools) + REST API for dashboard
+├── server.ts       → MCP server (27 tools) + REST API for dashboard
 ├── sandbox.ts      → .env sandbox with deterministic fakes (HMAC-SHA256)
 ├── backends.ts     → Multi-backend abstraction (local, 1Password, Bitwarden, env)
 ├── cli.ts          → CLI entry point (40+ commands)
@@ -61,7 +61,7 @@ keyblind setup-mcp    # Auto-configure Claude Code MCP
 ## Key Decisions
 
 - **MCP-first, not editor-first.** Works with every AI tool that speaks MCP (Claude Code, Cursor, Copilot, Windsurf, Cline, Zed), not just VS Code.
-- **16 MCP tools** — secrets, TOTP, sharing, dead man's switch, SSO, sandbox.
+- **27 MCP tools** — secrets, TOTP, sharing, team vaults, dead man's switch, SSO, sandbox, agent ledger.
 - **REST API alongside MCP** — same server supports browser dashboard at `app.keyblind.dev`.
 - **Deterministic sandbox fakes** using HMAC-SHA256(project hash + key name) so git diffs stay clean.
 - **Machine-identity-bound key** — encryption key XOR-wrapped with machine fingerprint.

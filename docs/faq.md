@@ -34,7 +34,7 @@ License keys are Ed25519-signed JSON payloads. The public key is baked into the 
 
 There are **no accounts and no sign-in** — Keyblind is fully local.
 
-- **Free tier** — install and go: `npm i -g keyblind`, then `keyblind init`. You get 5 secrets, all 7 backends, and all 16 MCP tools.
+- **Free tier** — install and go: `npm i -g keyblind`, then `keyblind init`. You get 5 secrets, all 7 backends, and all 27 MCP tools.
 - **Pro/Team** — buy a license at [keyblind.dev](https://keyblind.dev), receive the key by email, then run `keyblind activate <your-license-key>`.
 - **Dashboard** — `keyblind dashboard` opens `http://localhost:4318/` in your browser, already authenticated. No login, no pairing token.
 
@@ -44,7 +44,7 @@ Yes. For public repositories, run the test suite from source with `KEYBLIND_DEV=
 
 ## What MCP tools does Keyblind expose?
 
-16 tools: `resolve_secret`, `store_secret`, `list_secrets`, `delete_secret`, `sandbox_env`, `unsandbox_env`, `audit_log`, `totp_code`, `totp_store`, `totp_list`, `totp_delete`, `create_share_link`, `receive_share`, `deadman_status`, `deadman_checkin`, `sso_status`.
+27 tools: `resolve_secret`, `store_secret`, `list_secrets`, `delete_secret`, `sandbox_env`, `unsandbox_env`, `audit_log`, `totp_code`, `totp_store`, `totp_list`, `totp_delete`, `create_share_link`, `receive_share`, `deadman_status`, `deadman_checkin`, `team_init`, `team_push`, `team_pull`, `team_list`, `team_resolve`, `team_delete`, `sso_status`, `register_agent`, `record_action`, `verify_ledger`, `list_agents`, `export_compliance`.
 
 ## Does Keyblind support team vaults?
 

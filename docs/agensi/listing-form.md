@@ -23,7 +23,7 @@ The problem: 100,000+ LLM conversations with exposed secrets were found indexed 
 How it works: secrets stay encrypted at rest and are resolved just-in-time through the MCP protocol. Your agent gets the value when it needs it, without the value ever touching the transcript. No cloud, no accounts, no telemetry - the vault lives on your machine and the encryption key is bound to it.
 
 What you get:
-- 16 MCP tools - secrets CRUD, TOTP 2FA, encrypted sharing, dead man's switch, .env sandbox, audit log
+- 27 MCP tools - secrets CRUD, TOTP 2FA, encrypted sharing, team vaults, dead man's switch, .env sandbox, audit log, agent ledger
 - One-command setup: npm i -g keyblind && keyblind setup-mcp
 - Works with every MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed
 - Optional backends: 1Password, Bitwarden, env vars, AWS, GCP, Azure
@@ -127,7 +127,7 @@ Q: Does it work with my editor?
 A: Any MCP client - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed. It's protocol-level, not editor-specific.
 
 Q: What does the free tier include?
-A: 5 secrets with all 16 tools and every feature.
+A: 5 secrets with all 27 tools and every feature.
 ```
 
 ### Screenshots (up to 6)

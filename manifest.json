@@ -1,13 +1,13 @@
 {
   "mcpb_version": "0.1",
   "name": "keyblind",
-  "version": "0.1.1",
-  "description": "Encrypted secrets vault that prevents API keys from leaking to AI conversations. AES-256-GCM encrypted storage with MCP runtime resolution — plaintext never touches the LLM transcript.",
+  "version": "0.8.8",
+  "description": "Encrypted secrets vault that prevents API keys from leaking to AI conversations. AES-256-GCM encrypted storage with MCP runtime resolution, so plaintext never touches the LLM transcript.",
   "author": {
     "name": "Keyblind",
     "url": "https://github.com/aarifmms/keyblind"
   },
-  "homepage": "https://github.com/aarifmms/keyblind",
+  "homepage": "https://keyblind.dev",
   "license": "MIT",
   "server": {
     "type": "node",
@@ -18,17 +18,38 @@
     }
   },
   "categories": ["security", "developer-tools"],
-  "tags": ["secrets", "encryption", "vault", "api-keys", "sandbox", "mcp"],
+  "tags": ["secrets", "encryption", "vault", "api-keys", "sandbox", "mcp", "team-vaults", "totp", "deadman", "agent-ledger"],
   "tools": [
     "resolve_secret",
     "store_secret",
     "list_secrets",
     "sandbox_env",
     "unsandbox_env",
-    "delete_secret"
+    "delete_secret",
+    "audit_log",
+    "totp_code",
+    "totp_store",
+    "totp_list",
+    "totp_delete",
+    "create_share_link",
+    "receive_share",
+    "deadman_status",
+    "deadman_checkin",
+    "team_init",
+    "team_push",
+    "team_pull",
+    "team_list",
+    "team_resolve",
+    "team_delete",
+    "sso_status",
+    "register_agent",
+    "record_action",
+    "verify_ledger",
+    "list_agents",
+    "export_compliance"
   ],
   "compatibility": {
     "platforms": ["macos", "linux", "windows"],
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   }
 }

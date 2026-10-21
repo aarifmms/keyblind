@@ -18,7 +18,7 @@
 ```
 MCP-native secrets vault. Encrypt API keys, sandbox .env files with
 deterministic fakes, resolve at runtime. AI agents never see real values.
-16 MCP tools, 7 backends, 40+ CLI commands. Works with Claude Code,
+27 MCP tools, 7 backends, 40+ CLI commands. Works with Claude Code,
 Cursor, Copilot, Windsurf, Cline, Zed. MIT. Zero telemetry.
 ```
 
@@ -41,11 +41,11 @@ Caption: "After sandboxing: deterministic HMAC-SHA256 fakes. Clean git diffs. Sa
 
 ### Image 3: Feature Grid
 Show the full feature set: vault, sandbox, TOTP, sharing, dead man's switch, team vaults, dashboard.
-Caption: "16 MCP tools, 7 backends (local, 1Password, Bitwarden, AWS, GCP, Azure, env), 40+ CLI commands."
+Caption: "27 MCP tools, 7 backends (local, 1Password, Bitwarden, AWS, GCP, Azure, env), 40+ CLI commands."
 
 ### Image 4: Keyblind vs Cloak
 Comparison table from landing page.
-Caption: "Why Keyblind: MCP-native (not editor-specific), 16 tools vs 3, 7 backends vs 1, deterministic sandbox."
+Caption: "Why Keyblind: MCP-native (not editor-specific), 27 tools vs 3, 7 backends vs 1, deterministic sandbox."
 
 ### Image 5: Web Dashboard
 Screenshot of the local dashboard (localhost:4318) showing sidebar, secrets list, and health indicator.
@@ -68,8 +68,8 @@ at runtime. The AI never sees them.
 
 What's shipped in v0.6.0 (just published today):
 
-- 16 MCP tools — secrets, sandbox, TOTP, secret sharing, dead man's
-  switch, team vaults, SSO, audit log, HTTPS, alerts
+- 27 MCP tools — secrets, sandbox, TOTP, secret sharing, dead man's
+  switch, team vaults, SSO, audit log, agent ledger, alerts
 - 7 backends — local, 1Password, Bitwarden, env, AWS, GCP, Azure
 - 40+ CLI commands
 - Web dashboard served locally (localhost:4318) — no login, no pairing
@@ -82,7 +82,7 @@ native — works with every AI editor, not just VS Code. 7 backends vs 1.
 Deterministic sandbox vs random placeholders.
 
 Pricing:
-- Free: 5 secrets, all 7 backends, all 16 MCP tools
+- Free: 5 secrets, all 7 backends, all 27 MCP tools
 - Pro ($79/year): Unlimited secrets, team vaults, audit log, CI/CD,
   secret rotation, biometric gate, cloud backends
 - PH2025 code = 50% off Pro first year

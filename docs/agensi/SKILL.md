@@ -44,15 +44,15 @@ keyblind run -- npm start        # run a command with secrets as env vars
 keyblind list                    # names only - values never shown
 ```
 
-The agent calls MCP tools such as `resolve_secret`, `store_secret`, `list_secrets`, `totp_code`, `share_secret`, and more (16 tools total).
+The agent calls MCP tools such as `resolve_secret`, `store_secret`, `list_secrets`, `totp_code`, `create_share_link`, and more (27 tools total).
 
 ## Features
 
-- **16 MCP tools** - secrets CRUD, TOTP 2FA, encrypted sharing, dead man's switch, `.env` sandbox, audit log
+- **27 MCP tools** - secrets CRUD, TOTP 2FA, encrypted sharing, team vaults, dead man's switch, `.env` sandbox, audit log, agent ledger
 - **Works everywhere** - Claude Code, Cursor, Copilot, Windsurf, Cline, Zed
 - **Zero network, zero telemetry** - fully local, no cloud, no accounts
 - **Machine-identity-bound key** - encryption key wrapped with a machine fingerprint
 
 ## Pricing
 
-Free: 5 secrets with all 16 tools. Fully usable - no purchase required.
+Free: 5 secrets with all 27 tools. Fully usable - no purchase required.

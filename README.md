@@ -1,6 +1,6 @@
 # Keyblind — Blind AI to Your Keys
 
-**Encrypted secrets vault with MCP for AI agents. Secrets resolved at runtime, never leaked to LLM conversations.**
+**Encrypted secrets vault with MCP for AI agents. One command configures every editor. Secrets resolved at runtime, never leaked to LLM conversations.**
 
 [![npm version](https://img.shields.io/npm/v/keyblind)](https://www.npmjs.com/package/keyblind)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -17,7 +17,7 @@ AI agents read your `.env` files. They copy-paste secrets into conversations. Th
 ┌──────────┐     ┌────────────────┐     ┌─────────────────┐
 │ AI Agent │ ──→ │  Keyblind MCP  │ ──→ │  Encrypted      │
 │ (Claude) │     │  Server        │     │  SQLite Vault   │
-│          │ ←── │  (16 tools)    │ ←── │  (AES-256-GCM)  │
+│          │ ←── │  (27 tools)    │ ←── │  (AES-256-GCM)  │
 └──────────┘     └────────────────┘     └─────────────────┘
       ↑                                        │
       │ secret value never appears             │ secrets never
@@ -108,7 +108,18 @@ claude mcp add keyblind -- keyblind start --biometric
 | `receive_share` | Receive and decrypt a shared secret |
 | `deadman_status` | Check dead man's switch status |
 | `deadman_checkin` | Reset dead man's switch timer |
+| `team_init` | Create a shared team vault (encrypted SQLite) |
+| `team_push` | Push a local secret to the team vault |
+| `team_pull` | Import all secrets from the team vault |
+| `team_list` | List secret names in the team vault |
+| `team_resolve` | Resolve (decrypt) a secret from the team vault |
+| `team_delete` | Delete a secret from the team vault |
 | `sso_status` | Check SSO/OIDC authentication status |
+| `register_agent` | Register an AI agent bound to a human sponsor |
+| `record_action` | Append a signed action to the tamper-proof ledger |
+| `verify_ledger` | Verify ledger integrity (hash chain + signatures) |
+| `list_agents` | List registered AI agents |
+| `export_compliance` | Export the agent ledger as a compliance report |
 
 ## Web Dashboard
 
