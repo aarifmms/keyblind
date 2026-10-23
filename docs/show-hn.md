@@ -1,4 +1,4 @@
-**Title:** Show HN — Keyblind v0.9.0: An MCP Server That Blinds AI to Your API Keys
+**Title:** Show HN — Keyblind v0.9.1: An MCP Server That Blinds AI to Your Keys, Now With an Org-Wide Control Plane
 
 **URL:** https://github.com/aarifmms/keyblind
 
@@ -8,14 +8,18 @@ Your `.env` file has API keys, passwords, and tokens. Every AI coding tool (Clau
 
 Keyblind solves this. It's an MCP server that encrypts your secrets and resolves them at runtime. The AI agent never sees the real value.
 
-**New in v0.9.0 — human-in-the-loop approvals.** When an agent tries to store or delete a secret and approval is required, the request queues as "pending" instead of executing. The held value is encrypted at rest; the human approves or denies from the CLI or dashboard. An agent can never approve its own action, and reads are never gated.
+**New in v0.9.1 — a central control plane.** Approvals (v0.9.0) answered "should this agent act?" The control plane answers "what did every agent do across the org, and can I revoke them from one place?"
 
 ```bash
-keyblind approvals require on        # gate all agent writes
-keyblind approvals list              # see what's waiting
-keyblind approvals approve <id>      # execute it
-keyblind approvals deny <id>         # discard it
+keyblind control-plane init               # org Ed25519 keypair
+keyblind control-plane export             # signed, value-free org report
+keyblind control-plane trust <pubkey>     # member machines trust the org key
+keyblind control-plane apply <file>       # import a signed deny list
 ```
+
+`export` produces a signed JSON bundle with secret names + rotation age, agent identities and scopes, approvals, and the full ledger with its integrity verdict — no secret values, no ciphertext. Commit it to a git repo as a read-only org view. `apply` imports a signed deny list; a revoked agent is denied read and write on every machine that trusts the org key.
+
+**Human-in-the-loop approvals (v0.9.0).** When an agent tries to store or delete a secret and approval is required, the request queues as "pending" instead of executing. The human approves or denies from the CLI or dashboard. An agent can never approve its own action, and reads are never gated.
 
 **The sandbox trick:**
 
@@ -37,7 +41,7 @@ Same fakes every time (deterministic HMAC), so git diffs stay clean. AI agents s
 
 **Zero network, zero telemetry, zero accounts.** Fully local. Encryption key bound to your machine — copy the vault to another machine, it won't decrypt.
 
-**Comparison:** Cloak is VS Code/Cursor only. Keyblind is protocol-native — MCP support means every editor works today and tomorrow, plus a human-in-the-loop approval layer for agent writes.
+**Comparison:** Cloak is VS Code/Cursor only. Keyblind is protocol-native — MCP support means every editor works today and tomorrow, plus approvals and a central control plane for org governance.
 
 ```bash
 npm install -g keyblind
@@ -46,6 +50,6 @@ echo "sk-your-key" | keyblind set OPENAI_API_KEY
 keyblind sandbox
 ```
 
-MIT licensed. Built with TypeScript, SQLite, and paranoia. 27 MCP tools, 7 backends, 40+ CLI commands, 145 tests.
+MIT licensed. Built with TypeScript, SQLite, and paranoia. 27 MCP tools, 7 backends, 40+ CLI commands, 155 tests.
 
-I'd love feedback from the HN community — especially on the MCP-first approach vs editor-native alternatives, and how you'd want the approval workflow to behave.
+I'd love feedback from the HN community — especially on the local-first control plane: is a git-synced, signed export the right call vs a hosted SaaS dashboard?

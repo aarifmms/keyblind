@@ -121,18 +121,34 @@ keyblind approvals deny <id>         # discard it
 
 Approval is human-only by design: an agent can never sign off on its own action. Reads are never gated, only writes. Every request and decision is recorded in an append-only, hash-chained ledger, so you can audit exactly what an agent asked to do and whether a human let it through.
 
+## The Central Control Plane (v0.9.1)
+
+Approvals answered "should this agent act?" The control plane answers the harder question: "what did every agent do across the org, and can I revoke them from one place?"
+
+Keyblind is local-first, so there's no hosted vault to query. v0.9.1 bridges that without breaking zero-network. `keyblind control-plane export` produces a signed, **value-free** bundle: every secret's name and rotation age, every agent's identity and scope, every approval, and the full ledger with its integrity verdict. No secret values, no ciphertext. Commit it to a git repo and you have a read-only org view.
+
+```bash
+keyblind control-plane init               # generate an org Ed25519 keypair
+keyblind control-plane export             # signed org report
+keyblind control-plane trust <pubkey>     # member machines trust the org key
+keyblind control-plane apply <file>       # import a signed deny list
+```
+
+`control-plane apply` imports a signed deny list. Revoke an agent in one place, and every machine that trusts the org key denies it, read and write, at the same choke point that enforces scope.
+
 ## What's Shipped
 
-As of v0.9.0, Keyblind ships:
+As of v0.9.1, Keyblind ships:
 
 - 27 MCP tools, 7 backends, 40+ CLI commands
 - One-command onboarding (`keyblind quickstart`) and multi-editor MCP setup
 - Human-in-the-loop approvals for agent writes
+- Central control plane for org-wide visibility + signed revocation
 - Agent ledger with scope enforcement and per-secret policies
 - CI/CD secret injection and repo secret scanning
 - Provider-agnostic secret rotation (`keyblind rotate --exec`)
 - Team vaults, TOTP, secret sharing, dead man's switch, SSO
-- 145 tests, zero production audit vulnerabilities, signed npm provenance
+- 155 tests, zero production audit vulnerabilities, signed npm provenance
 
 ## Try It
 

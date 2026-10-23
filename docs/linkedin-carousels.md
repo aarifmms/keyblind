@@ -6,7 +6,45 @@ canvas is 1080x1080.
 
 ---
 
-## 1. Human approval for agent secret writes
+## 1. An org-wide control plane for your agents
+
+**Commit:** `46e486a` — central control plane (signed value-free export + signed deny list)
+
+**Caption:**
+
+Keyblind v0.9.1 is out.
+
+Approvals answered "should this agent act?" Now the control plane answers the
+harder question: "what did every agent do across the org, and can I revoke them
+from one place?"
+
+Keyblind is local-first, so there's no hosted vault to query. v0.9.1 bridges that
+without breaking zero-network: `keyblind control-plane export` produces a signed,
+value-free bundle of secret names and rotation age, agent identities and scopes,
+approvals, and the full ledger with its integrity verdict. No secret values, no
+ciphertext. Commit it to a git repo and you have a read-only org view.
+
+`control-plane apply` imports a signed deny list. Revoke an agent once, and every
+machine that trusts the org key denies it, read and write.
+
+Local-first governance, without a server to breach.
+
+`#keyblind #aisecurity #governance #mcp #buildinpublic`
+
+**Slides:**
+
+1. **v0.9.1 is live** — an org-wide control plane, still zero network.
+2. **The gap** — the vault and ledger are per-machine, so there's no org-wide answer to "who accessed what?"
+3. **The bridge** — a signed, value-free export you commit to a git repo as a read-only org view.
+4. **Value-free by construction** — secret names and rotation age, agent scopes, approvals, ledger verdict. No values, no ciphertext.
+5. **Central revocation** — `apply` imports a signed deny list; revoked agents are denied read and write.
+6. **Trust model** — one org Ed25519 keypair; member machines `trust` it once.
+7. **The rest** — 27 MCP tools, 7 backends, zero network, MIT.
+8. **Try it** — `npm i -g keyblind` then `keyblind control-plane init`.
+
+---
+
+## 2. Human approval for agent secret writes
 
 **Commit:** `e4d6934` — agent action approval workflows (human-in-the-loop)
 
@@ -40,7 +78,7 @@ Would you let an agent write to your vault without a human in the loop?
 
 ---
 
-## 2. Keyblind is now a Claude Code skill
+## 3. Keyblind is now a Claude Code skill
 
 **Commit:** `48887b3` — add keyblind skill and migrate manifest to v0.4
 
@@ -74,7 +112,7 @@ Are you shipping skills for your MCP tools yet?
 
 ---
 
-## 3. One-click install from the Smithery registry
+## 4. One-click install from the Smithery registry
 
 **Commit:** `2f310ba` — update smithery.yaml to current format
 
@@ -105,7 +143,7 @@ infrastructure.
 
 ---
 
-## 4. Repositioned for the agentic era
+## 5. Repositioned for the agentic era
 
 **Commit:** `004f729` — refresh distribution metadata and positioning
 
@@ -139,7 +177,7 @@ Which one-liner lands better with you:
 
 ---
 
-## 5. v0.8.8 shipped
+## 6. v0.8.8 shipped
 
 **Commit:** `9544653` — bump version to 0.8.8
 
@@ -170,7 +208,7 @@ Open source, MIT. 27 tools. Zero network.
 
 ---
 
-## 6. Team-wide editor config in one command
+## 7. Team-wide editor config in one command
 
 **Commit:** `8c68941` — add `setup-mcp --local` for project editor configs
 
@@ -204,7 +242,7 @@ That's the shift I care about: move secret hygiene from "someone remembered" to
 
 ---
 
-## 7. Cline and Zed join the party
+## 8. Cline and Zed join the party
 
 **Commit:** `5a49018` — extend setup-mcp to configure Cline and Zed
 
@@ -234,7 +272,7 @@ Which editor do you want to see next?
 
 ---
 
-## 8. From zero to vault in one command
+## 9. From zero to vault in one command
 
 **Commit:** `e468820` — add `keyblind quickstart` one-command onboarding
 
@@ -265,7 +303,7 @@ That's the whole design philosophy: security that's too easy to skip.
 
 ---
 
-## 9. Zero production vulnerabilities
+## 10. Zero production vulnerabilities
 
 **Commit:** `96d1991` — pin transitive deps to patched versions (zero prod audit)
 
@@ -296,7 +334,7 @@ Trust is earned in the supply chain, one pinned version at a time.
 
 ---
 
-## 10. I deleted a feature on purpose
+## 11. I deleted a feature on purpose
 
 **Commit:** `771d12a` — remove Let's Encrypt/HTTPS feature and acme-client dependency
 
@@ -328,7 +366,7 @@ Sometimes the best security feature is the one you remove.
 
 ---
 
-## 11. Docs that reflect reality
+## 12. Docs that reflect reality
 
 **Commit:** `5daf174` — reflect that setup-mcp now configures Cline and Zed
 
