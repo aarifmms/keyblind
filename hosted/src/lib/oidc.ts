@@ -11,6 +11,8 @@ export interface OidcProvider {
   groupsClaim?: string;
   adminGroup?: string;
   ownerGroup?: string;
+  orgSlug?: string;
+  autoProvision?: boolean;
 }
 
 export interface OidcState {
@@ -26,6 +28,7 @@ interface Discovery {
   token_endpoint: string;
   jwks_uri: string;
   end_session_endpoint?: string;
+  revocation_endpoint?: string;
 }
 
 function getSecret(): Uint8Array {
@@ -54,6 +57,8 @@ export function getOidcProviders(): OidcProvider[] {
         groupsClaim: typeof p.groupsClaim === "string" ? p.groupsClaim : undefined,
         adminGroup: typeof p.adminGroup === "string" ? p.adminGroup : undefined,
         ownerGroup: typeof p.ownerGroup === "string" ? p.ownerGroup : undefined,
+        orgSlug: typeof p.orgSlug === "string" ? p.orgSlug : undefined,
+        autoProvision: p.autoProvision === true ? true : undefined,
       }))
       .filter((p) => p.id && p.issuer && p.clientId && p.clientSecret);
   } catch {
@@ -139,6 +144,7 @@ export async function buildAuthorizeUrl(
 
 interface TokenResponse {
   id_token?: string;
+  refresh_token?: string;
 }
 
 async function postToken(endpoint: string, body: URLSearchParams, basicAuth?: string): Promise<TokenResponse> {
@@ -154,7 +160,7 @@ export async function exchangeCode(
   code: string,
   codeVerifier: string,
   redirectUri: string,
-): Promise<string> {
+): Promise<{ idToken: string; refreshToken?: string }> {
   const discovery = await getDiscovery(provider);
   const basicAuth = Buffer.from(`${provider.clientId}:${provider.clientSecret}`).toString("base64");
 
@@ -169,7 +175,7 @@ export async function exchangeCode(
 
   try {
     const token = await postToken(discovery.token_endpoint, baseBody(), basicAuth);
-    if (token.id_token) return token.id_token;
+    if (token.id_token) return { idToken: token.id_token, refreshToken: token.refresh_token };
   } catch {
     // fall through to client_secret_post
   }
@@ -179,7 +185,7 @@ export async function exchangeCode(
   body.set("client_secret", provider.clientSecret);
   const token = await postToken(discovery.token_endpoint, body);
   if (!token.id_token) throw new Error("No id_token in token response");
-  return token.id_token;
+  return { idToken: token.id_token, refreshToken: token.refresh_token };
 }
 
 export async function verifyIdToken(provider: OidcProvider, idToken: string, nonce: string): Promise<Record<string, unknown>> {
@@ -210,6 +216,53 @@ export async function verifyIdTokenWithKey(
     throw new Error("email not verified");
   }
   return payload as Record<string, unknown>;
+}
+
+const BACKCHANNEL_LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
+
+// Verifies an OIDC backchannel logout_token against an injected key resolver
+// (production passes the remote JWKS; tests pass a local JWKS to avoid the network).
+export async function verifyLogoutTokenWithKey(
+  provider: OidcProvider,
+  logoutToken: string,
+  getKey: jose.JWTVerifyGetKey,
+): Promise<{ sub?: string; sid?: string }> {
+  const { payload } = await jose.jwtVerify(logoutToken, getKey, {
+    issuer: provider.issuer,
+    audience: provider.clientId,
+  });
+
+  const events = payload.events;
+  const hasBackchannel =
+    typeof events === "object" && events !== null &&
+    Object.prototype.hasOwnProperty.call(events, BACKCHANNEL_LOGOUT_EVENT);
+  if (!hasBackchannel) throw new Error("missing backchannel-logout event");
+
+  const sub = typeof payload.sub === "string" ? payload.sub : undefined;
+  const sid = typeof payload.sid === "string" ? payload.sid : undefined;
+  if (!sub && !sid) throw new Error("logout token missing sub and sid");
+  return { sub, sid };
+}
+
+export async function verifyLogoutToken(provider: OidcProvider, logoutToken: string): Promise<{ sub?: string; sid?: string }> {
+  const jwks = await getCachedJwks(provider);
+  return verifyLogoutTokenWithKey(provider, logoutToken, jwks);
+}
+
+export async function revokeToken(provider: OidcProvider, token: string): Promise<void> {
+  const discovery = await getDiscovery(provider);
+  if (!discovery.revocation_endpoint) return;
+  const basicAuth = Buffer.from(`${provider.clientId}:${provider.clientSecret}`).toString("base64");
+  const body = new URLSearchParams();
+  body.set("token", token);
+  body.set("token_type_hint", "refresh_token");
+  const res = await fetch(discovery.revocation_endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${basicAuth}` },
+    body: body.toString(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Token revocation failed (${res.status})`);
 }
 
 export async function signOidcState(state: OidcState): Promise<string> {

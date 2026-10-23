@@ -140,8 +140,9 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - Central control plane (org-wide visibility + signed revocation)
 
 A hosted control plane (`hosted/`) adds orgs, roles, groups, a signed
-revocation + group-scope manifest, multi-provider SSO login, and short-lived
-agent credentials. See `docs/enterprise.md` (Phase 2).
+revocation + group-scope manifest, multi-provider SSO login (with org
+auto-provisioning, multi-org switching, and IdP end-session revocation), and
+short-lived agent credentials. See `docs/enterprise.md` (Phase 2).
 
 ## Browser Extension
 

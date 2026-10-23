@@ -141,9 +141,24 @@ Two design notes worth flagging:
   generated server-side and stored AES-256-GCM-encrypted at rest under a server
   secret (`CONTROL_PLANE_KEY_ENC_KEY`). Member machines hold only the public key.
   This is a deliberate centralization tradeoff, not a hidden one.
-- **SSO does not auto-provision orgs.** An SSO user still joins an org via invite;
-  group→role/scope mapping applies within that org. Multi-org membership and IdP
-  end-session revocation remain deferred.
+- **SSO auto-provisioning and IdP end-session ship in Phase 2c** (below).
+
+**Phase 2c (multi-org, SSO auto-provisioning, IdP end-session)** — shipped:
+
+- **Multi-org membership + active-org selector.** A user can belong to many orgs
+  (`org_members` PK is `(org_id, user_id)`). The dashboard gains an org switcher
+  that sets a `keyblind_org` cookie; every org route resolves the *active* org
+  through `requireOrgRole`, falling back to the first-joined org when no cookie is
+  set. `GET /api/orgs` lists memberships, `POST /api/orgs/active` switches.
+- **SSO auto-provisioning.** Providers may carry `orgSlug` + `autoProvision`; a
+  first-time SSO login joins the org by slug, or creates it when `autoProvision`
+  is true, then applies `adminGroup`/`ownerGroup` mapping.
+- **IdP end-session + refresh.** Sessions are persisted (a `sessions` table keyed
+  by `jti`, storing `sid`, `id_token_hint`, and any `refresh_token`). Back-channel
+  logout (`POST /api/auth/sso/backchannel-logout`) verifies a signed `logout_token`
+  and revokes every session for that `(issuer, sub|sid)`. RP-initiated logout sends
+  `id_token_hint` + `client_id` and revokes the refresh token at the
+  `revocation_endpoint` when present.
 
 ### Phase 3 — Automated rotation
 

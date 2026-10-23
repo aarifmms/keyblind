@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
-import { createOrg, getOrgForUser } from "@/lib/org";
+import { cookies } from "next/headers";
+import { requireSession, setActiveOrgCookie, ORG_COOKIE } from "@/lib/auth";
+import { createOrg, getOrgForUser, listOrgsForUser } from "@/lib/org";
 import { ApiError } from "@/lib/org-auth";
 
 function slugify(name: string): string {
@@ -19,7 +20,9 @@ export async function POST(req: Request) {
     if (!name) throw new ApiError("Name is required", 400);
     const slug = (typeof body.slug === "string" && body.slug.trim()) || slugify(name);
     const org = await createOrg(name, slug, session.email);
-    return NextResponse.json({ org }, { status: 201 });
+    const res = NextResponse.json({ org }, { status: 201 });
+    setActiveOrgCookie(res, org.id);
+    return res;
   } catch (err) {
     if (!(err instanceof ApiError)) console.error("POST /api/org failed:", (err as Error).message);
     const status = err instanceof ApiError ? err.status : 500;
@@ -31,9 +34,12 @@ export async function GET() {
   try {
     const session = await requireSession();
     if (!session.userId) throw new ApiError("Unauthorized", 401);
-    const membership = await getOrgForUser(session.userId);
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get(ORG_COOKIE)?.value;
+    const membership = await getOrgForUser(session.userId, activeOrgId || undefined);
     if (!membership) throw new ApiError("No organization", 404);
-    return NextResponse.json({ org: membership.org, role: membership.role });
+    const orgs = await listOrgsForUser(session.userId);
+    return NextResponse.json({ org: membership.org, role: membership.role, orgs });
   } catch (err) {
     if (!(err instanceof ApiError)) console.error("GET /api/org failed:", (err as Error).message);
     const status = err instanceof ApiError ? err.status : 500;

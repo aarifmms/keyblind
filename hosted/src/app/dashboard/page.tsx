@@ -1,13 +1,20 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Shield, LogOut, Mail, BadgeCheck, Calendar } from "lucide-react";
-import { verifySessionToken } from "@/lib/auth";
+import { verifySessionToken, ORG_COOKIE } from "@/lib/auth";
+import { listOrgsForUser } from "@/lib/org";
+import OrgSwitcher from "./org-switcher";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get("keyblind_token")?.value;
   const user = token ? await verifySessionToken(token) : null;
   if (!user) redirect("/login");
+
+  const orgs = user.userId ? await listOrgsForUser(user.userId) : [];
+  const activeOrgCookie = cookieStore.get(ORG_COOKIE)?.value;
+  const activeOrgId =
+    orgs.find((m) => m.org.id === activeOrgCookie)?.org.id ?? orgs[0]?.org.id ?? null;
 
   const tierLabel =
     user.tier === "team" ? "Team" : user.tier === "pro" ? "Pro" : "Free";
@@ -32,6 +39,11 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold text-[#f0f6fc]">Keyblind</h1>
           <p className="text-sm text-[#8b949e] mt-1">Your account</p>
         </div>
+
+        <OrgSwitcher
+          orgs={orgs.map((m) => ({ id: m.org.id, name: m.org.name, role: m.role }))}
+          activeOrgId={activeOrgId}
+        />
 
         <div className="bg-[#161b22] border border-[#21262d] rounded-lg p-6">
           <div className="flex items-center justify-between mb-5">

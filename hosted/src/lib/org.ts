@@ -163,13 +163,53 @@ export async function getOrgBySlug(slug: string): Promise<OrgRow | null> {
   return { id: String(row.id), name: String(row.name), slug: String(row.slug), publicKey: String(row.publicKey), createdAt: String(row.createdAt) };
 }
 
-export async function getOrgForUser(userId: string): Promise<{ org: OrgRow; role: Role } | null> {
+// Idempotently resolves an org by slug, creating it (with `ownerEmail` as owner)
+// only when it does not yet exist.
+export async function getOrCreateOrgBySlug(slug: string, name: string, ownerEmail: string): Promise<OrgRow> {
+  const existing = await getOrgBySlug(slug);
+  if (existing) return existing;
+  return createOrg(name, slug, ownerEmail);
+}
+
+// Joins (or, when configured, creates) the org a provider maps an SSO user to.
+// Returns null when the provider has no org mapping (no auto-provisioning).
+export async function provisionSsoUser(
+  userId: string,
+  email: string,
+  groups: string[],
+  opts: { orgSlug?: string; autoProvision?: boolean; ownerGroup?: string; adminGroup?: string },
+): Promise<{ org: OrgRow; role: Role } | null> {
+  if (!opts.orgSlug) return null;
+
+  let org = await getOrgBySlug(opts.orgSlug);
+  if (!org && opts.autoProvision) {
+    org = await createOrg(opts.orgSlug, opts.orgSlug, email);
+  }
+  if (!org) return null;
+
+  const db = getDb();
+  await db.execute({
+    sql: "INSERT INTO org_members (org_id, user_id, role) VALUES (?, ?, 'member') ON CONFLICT(org_id, user_id) DO NOTHING",
+    args: [org.id, userId],
+  });
+
+  if (groups.length > 0) {
+    await applySsoGroupMapping(userId, org.id, groups, { ownerGroup: opts.ownerGroup, adminGroup: opts.adminGroup });
+  }
+
+  const role = await getRole(userId, org.id);
+  return { org, role: role ?? "member" };
+}
+
+export async function getOrgForUser(userId: string, orgId?: string): Promise<{ org: OrgRow; role: Role } | null> {
   await migrate();
   const db = getDb();
+  const orgClause = orgId ? "AND m.org_id = ?" : "";
+  const args = orgId ? [userId, orgId] : [userId];
   const r = await db.execute({
     sql: `SELECT o.id, o.name, o.slug, o.public_key AS publicKey, o.created_at AS createdAt, m.role
-          FROM org_members m JOIN orgs o ON o.id = m.org_id WHERE m.user_id = ? LIMIT 1`,
-    args: [userId],
+          FROM org_members m JOIN orgs o ON o.id = m.org_id WHERE m.user_id = ? ${orgClause} ORDER BY m.joined_at LIMIT 1`,
+    args,
   });
   if (r.rows.length === 0) return null;
   const row = r.rows[0];
@@ -177,6 +217,20 @@ export async function getOrgForUser(userId: string): Promise<{ org: OrgRow; role
     org: { id: String(row.id), name: String(row.name), slug: String(row.slug), publicKey: String(row.publicKey), createdAt: String(row.createdAt) },
     role: String(row.role) as Role,
   };
+}
+
+export async function listOrgsForUser(userId: string): Promise<{ org: OrgRow; role: Role }[]> {
+  await migrate();
+  const db = getDb();
+  const r = await db.execute({
+    sql: `SELECT o.id, o.name, o.slug, o.public_key AS publicKey, o.created_at AS createdAt, m.role
+          FROM org_members m JOIN orgs o ON o.id = m.org_id WHERE m.user_id = ? ORDER BY m.joined_at`,
+    args: [userId],
+  });
+  return r.rows.map((row) => ({
+    org: { id: String(row.id), name: String(row.name), slug: String(row.slug), publicKey: String(row.publicKey), createdAt: String(row.createdAt) },
+    role: String(row.role) as Role,
+  }));
 }
 
 async function getRole(userId: string, orgId: string): Promise<Role | null> {
@@ -246,7 +300,9 @@ export async function addGroupMember(orgId: string, groupId: string, userId: str
   await migrate();
   const db = getDb();
   await db.execute({
-    sql: "INSERT INTO group_members (group_id, user_id) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM groups WHERE id = ? AND org_id = ?)",
+    sql: `INSERT INTO group_members (group_id, user_id)
+          SELECT ?, ? WHERE EXISTS (SELECT 1 FROM groups WHERE id = ? AND org_id = ?)
+          ON CONFLICT(group_id, user_id) DO NOTHING`,
     args: [groupId, userId, groupId, orgId],
   });
 }

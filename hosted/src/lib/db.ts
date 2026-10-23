@@ -79,6 +79,20 @@ async function runMigrate(): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY(issuer, sub)
     )`,
+    `CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      issuer TEXT NOT NULL,
+      sub TEXT NOT NULL,
+      sid TEXT,
+      id_token_hint TEXT,
+      refresh_token TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT,
+      revoked_at TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_sessions_issuer_sub ON sessions(issuer, sub)`,
+    `CREATE INDEX IF NOT EXISTS idx_sessions_issuer_sid ON sessions(issuer, sid)`,
   ];
   await db.batch(statements, "write");
 }

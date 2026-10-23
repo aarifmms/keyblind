@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
+import { createSessionToken, setActiveOrgCookie, SESSION_MAX_AGE } from "@/lib/auth";
 import { verifyLicenseKey } from "@/lib/license";
 import { getOrCreateUser, getOrgForUser } from "@/lib/org";
 
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: SESSION_MAX_AGE,
     });
+    setActiveOrgCookie(res, membership?.org.id ?? null);
 
     return res;
   } catch (err) {

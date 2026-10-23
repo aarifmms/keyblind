@@ -1,4 +1,5 @@
-import { requireSession, type SessionUser } from "./auth";
+import { cookies } from "next/headers";
+import { requireSession, ORG_COOKIE, type SessionUser } from "./auth";
 import { getOrgForUser, type OrgRow, type Role } from "./org";
 
 export class ApiError extends Error {
@@ -16,7 +17,9 @@ export async function requireOrgRole(roles: Role[]): Promise<{ user: SessionUser
   }
   if (!user.userId) throw new ApiError("Unauthorized", 401);
 
-  const membership = await getOrgForUser(user.userId);
+  const cookieStore = await cookies();
+  const activeOrgId = cookieStore.get(ORG_COOKIE)?.value;
+  const membership = await getOrgForUser(user.userId, activeOrgId || undefined);
   if (!membership) throw new ApiError("No organization", 404);
   if (!roles.includes(membership.role)) throw new ApiError("Forbidden", 403);
 

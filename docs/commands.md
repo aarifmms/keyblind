@@ -242,7 +242,8 @@ Per-provider fields: `id`, `name`, `issuer`, `clientId`, `clientSecret`, optiona
 `allowedDomains` (email-domain allowlist), `groupsClaim` (default `groups`), `adminGroup`,
 and `ownerGroup`. When a `groups` claim is present on an SSO user already in an org, the
 `ownerGroup`/`adminGroup` values promote the member role and the claim syncs hosted
-scope-groups.
+scope-groups. For SSO auto-provisioning, add `orgSlug` (join or create this org) and
+`autoProvision: true` (create the org on first login when it does not exist).
 
 ### Org-issued agent tokens (Phase 2b)
 

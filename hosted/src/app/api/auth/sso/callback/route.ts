@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getProvider, exchangeCode, verifyIdToken, verifyOidcState } from "@/lib/oidc";
-import { createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
-import { findOrCreateUserByIdentity, getOrgForUser, applySsoGroupMapping } from "@/lib/org";
+import { createSessionToken, setActiveOrgCookie, SESSION_MAX_AGE } from "@/lib/auth";
+import { createSession } from "@/lib/sessions";
+import { findOrCreateUserByIdentity, getOrgForUser, applySsoGroupMapping, provisionSsoUser } from "@/lib/org";
 
 const STATE_COOKIE = "keyblind_oidc_state";
 
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
       return redirectTo("/login?error=sso-state");
     }
 
-    const idToken = await exchangeCode(provider, code, oidcState.codeVerifier, `${url.origin}/api/auth/sso/callback`);
+    const { idToken, refreshToken } = await exchangeCode(provider, code, oidcState.codeVerifier, `${url.origin}/api/auth/sso/callback`);
     const claims = await verifyIdToken(provider, idToken, oidcState.nonce);
 
     const email = String(claims.email).trim().toLowerCase();
@@ -47,16 +48,37 @@ export async function GET(req: Request) {
 
     const name = typeof claims.name === "string" ? claims.name : undefined;
     const user = await findOrCreateUserByIdentity(provider.issuer, String(claims.sub), email, name);
-    const membership = await getOrgForUser(user.id);
 
     const groupsClaim = provider.groupsClaim || "groups";
     const groups = extractGroups(claims, groupsClaim);
+
+    let membership = await getOrgForUser(user.id);
+    if (!membership && provider.orgSlug) {
+      membership = await provisionSsoUser(user.id, user.email, groups, {
+        orgSlug: provider.orgSlug,
+        autoProvision: provider.autoProvision,
+        ownerGroup: provider.ownerGroup,
+        adminGroup: provider.adminGroup,
+      });
+    }
     if (membership && groups.length > 0) {
       await applySsoGroupMapping(user.id, membership.org.id, groups, {
         ownerGroup: provider.ownerGroup,
         adminGroup: provider.adminGroup,
       });
     }
+
+    const sid = typeof claims.sid === "string" ? claims.sid : undefined;
+    const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
+    const jti = await createSession({
+      userId: user.id,
+      issuer: provider.issuer,
+      sub: String(claims.sub),
+      sid,
+      idTokenHint: idToken,
+      refreshToken,
+      expiresAt,
+    });
 
     const token = await createSessionToken({
       email: user.email,
@@ -67,6 +89,7 @@ export async function GET(req: Request) {
       authMethod: "sso",
       oidcSub: String(claims.sub),
       issuer: provider.issuer,
+      jti,
     });
 
     const res = redirectTo(oidcState.redirectAfter || "/dashboard");
@@ -77,6 +100,7 @@ export async function GET(req: Request) {
       path: "/",
       maxAge: SESSION_MAX_AGE,
     });
+    setActiveOrgCookie(res, membership?.org.id ?? null);
     res.cookies.set(STATE_COOKIE, "", {
       httpOnly: true,
       sameSite: "lax",

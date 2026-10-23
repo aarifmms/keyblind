@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import * as jose from "jose";
-import { getOidcProviders, signOidcState, verifyOidcState, verifyIdTokenWithKey, codeChallengeFor, generatePkce, type OidcProvider } from "./oidc";
+import { getOidcProviders, signOidcState, verifyOidcState, verifyIdTokenWithKey, verifyLogoutTokenWithKey, codeChallengeFor, generatePkce, type OidcProvider } from "./oidc";
 
 const ORIGINAL_OIDC = process.env.OIDC_PROVIDERS;
 
@@ -22,6 +22,15 @@ describe("getOidcProviders", () => {
     expect(providers[0].allowedDomains).toEqual(["corp.com"]);
     expect(providers[1].adminGroup).toBe("admins");
     expect(providers[1].ownerGroup).toBe("owners");
+  });
+
+  it("parses orgSlug and autoProvision", () => {
+    process.env.OIDC_PROVIDERS = JSON.stringify([
+      { id: "okta", name: "Okta", issuer: "https://iss", clientId: "c", clientSecret: "s", orgSlug: "acme", autoProvision: true },
+    ]);
+    const [p] = getOidcProviders();
+    expect(p.orgSlug).toBe("acme");
+    expect(p.autoProvision).toBe(true);
   });
 
   it("drops providers missing required fields", () => {
@@ -98,5 +107,43 @@ describe("verifyIdToken", () => {
     const { idToken, getKey } = await setup({ email: "a@corp.com", email_verified: true, sub: "sub-1" }, "nonce-3");
     const wrongIssuer: OidcProvider = { ...provider, issuer: "https://evil.example" };
     await expect(verifyIdTokenWithKey(wrongIssuer, idToken, "nonce-3", getKey)).rejects.toThrow();
+  });
+});
+
+describe("verifyLogoutToken", () => {
+  const provider: OidcProvider = { id: "issuer-example", name: "Test", issuer: "https://issuer.example", clientId: "client-id", clientSecret: "secret" };
+  const BACKCHANNEL = "http://schemas.openid.net/event/backchannel-logout";
+
+  async function signLogout(claims: Record<string, unknown>) {
+    const { publicKey, privateKey } = await jose.generateKeyPair("ES256");
+    const pubJwk = { ...(await jose.exportJWK(publicKey)), kid: "k1", alg: "ES256", use: "sig" };
+    const token = await new jose.SignJWT(claims)
+      .setProtectedHeader({ alg: "ES256", kid: "k1" })
+      .setIssuer(provider.issuer)
+      .setAudience(provider.clientId)
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    return { token, getKey: jose.createLocalJWKSet({ keys: [pubJwk] }) };
+  }
+
+  it("verifies a sub-based logout token", async () => {
+    const { token, getKey } = await signLogout({ sub: "sub-1", events: { [BACKCHANNEL]: {} } });
+    expect(await verifyLogoutTokenWithKey(provider, token, getKey)).toEqual({ sub: "sub-1" });
+  });
+
+  it("verifies a sid-based logout token", async () => {
+    const { token, getKey } = await signLogout({ sid: "sid-1", events: { [BACKCHANNEL]: {} } });
+    expect(await verifyLogoutTokenWithKey(provider, token, getKey)).toEqual({ sid: "sid-1" });
+  });
+
+  it("rejects a token missing the backchannel-logout event", async () => {
+    const { token, getKey } = await signLogout({ sub: "sub-1", events: {} });
+    await expect(verifyLogoutTokenWithKey(provider, token, getKey)).rejects.toThrow(/backchannel-logout/);
+  });
+
+  it("rejects a token with neither sub nor sid", async () => {
+    const { token, getKey } = await signLogout({ events: { [BACKCHANNEL]: {} } });
+    await expect(verifyLogoutTokenWithKey(provider, token, getKey)).rejects.toThrow(/sub and sid/);
   });
 });
