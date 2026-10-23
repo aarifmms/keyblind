@@ -1,7 +1,7 @@
 # Enterprise Readiness
 
 An honest assessment of where Keyblind stands for enterprise adoption, what's
-still missing, and the roadmap to close the gap. Updated for v0.9.0.
+still missing, and the roadmap to close the gap. Updated for v0.9.1.
 
 ## Positioning
 
@@ -36,13 +36,15 @@ is the defining enterprise gap and the roadmap below is built around it.
   enforcement backstop.
 - **CI/CD injection** — encrypted bundles decrypted at runtime into `$GITHUB_ENV`.
 - **Supply chain** — signed npm provenance via staged publishing (human 2FA
-  gated), zero production audit vulnerabilities, 145 tests.
+  gated), zero production audit vulnerabilities, 155 tests.
 
 ## What's not there yet
 
-1. **No central control plane.** The vault, ledger, and policies are per-machine.
-   There is no org-wide view of "who can access what," no central revocation, no
-   shared enforcement point.
+1. **No *centralized* control plane.** Phase 1 (`keyblind control-plane`) shipped a
+   *synchronized* spine: a signed, value-free export for org-wide visibility and a
+   signed deny list for central revocation, shared via a git repo or object store.
+   What remains is true centralization — a hosted, real-time control plane with no
+   manual export/apply step.
 2. **No real RBAC or directory integration.** Team vaults are gated by a shared
    passphrase; agent identity is a name/email string. SSO today only wraps
    team-vault access. No SCIM, no group-based access control.
