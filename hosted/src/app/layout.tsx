@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Keyblind — Activate",
-  description: "Activate your Keyblind license",
+  title: "Keyblind",
+  description: "Sign in to your Keyblind license",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
