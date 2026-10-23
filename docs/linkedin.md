@@ -1,38 +1,37 @@
-**Title:** I Built a Tool That Prevents AI Coding Tools From Leaking Your API Keys
+**Title:** My Secrets Vault Now Makes AI Agents Ask Permission Before Writing
 
 ---
 
-Last year, researchers found 100,000+ LLM conversation transcripts with exposed API keys, passwords, and tokens — publicly indexed by search engines.
+Keyblind just shipped v0.9.0, and it closes the last gap in how I think about agent secret access.
 
-AI coding tools like Claude Code, Cursor, and Copilot can't tell the difference between code and secrets. They read your `.env` file, copy from it, and sometimes those secrets end up in transcripts forever.
+Until now, Keyblind could *stop* an AI agent from touching a secret it wasn't authorized for. What it couldn't do was *hold* a sensitive write for a human's sign-off. Deny, or allow immediately — nothing in between.
 
-I built **Keyblind** to solve this.
+v0.9.0 adds human-in-the-loop approvals.
 
-It's an MCP server that encrypts your secrets and resolves them at runtime — the AI agent never sees the real value.
+When an agent calls `store_secret` or `delete_secret` and approval is required, the request is queued as "pending" instead of executing. The held value is encrypted at rest. The human approves or denies from the CLI or the dashboard:
 
-**How it works:**
-- `keyblind sandbox` replaces every real `.env` value with a deterministic fake
-- AI agents see only fakes
-- `keyblind run -- npm start` injects real secrets as env vars for that command only
-- `keyblind unsandbox` restores everything when you're done
+```bash
+keyblind approvals require on        # gate all agent writes
+keyblind approvals list              # see what's waiting
+keyblind approvals approve <id>      # execute it
+keyblind approvals deny <id>         # discard it
+```
 
-**Key features:**
+Approval is human-only by design — an agent can never approve its own action. Reads are never gated; only writes.
+
+For anyone new here: Keyblind is an MCP server that encrypts your secrets and resolves them at runtime, so AI agents never see the real value.
+
 - Works with every AI editor (Claude Code, Cursor, Copilot, Windsurf, Cline, Zed)
-- 7 secret backends (local AES-256-GCM, 1Password, Bitwarden, AWS/GCP/Azure)
+- 27 MCP tools, 7 backends, 40+ CLI commands
+- Deterministic `.env` sandboxing (`keyblind sandbox`)
 - Zero network, zero telemetry, zero accounts
-- Biometric gate (Touch ID)
-- GitHub Actions CI integration
-- Team vaults for shared secrets
-
-Open source, MIT licensed. No cloud. No accounts. Secrets stay on your machine.
+- Open source, MIT
 
 ```bash
 npm install -g keyblind
-keyblind init
-echo "sk-your-key" | keyblind set OPENAI_API_KEY
-keyblind sandbox
+keyblind quickstart
 ```
 
 GitHub: https://github.com/aarifmms/keyblind
 
-Curious to hear from developers using AI tools — how are you currently protecting your secrets? What would you want in a tool like this?
+If you let AI agents write secrets today, how do you review what they changed? Curious how other people are handling this.

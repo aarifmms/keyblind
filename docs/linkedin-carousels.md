@@ -1,4 +1,4 @@
-# Keyblind — LinkedIn Carousel Posts (last 10 commits)
+# Keyblind — LinkedIn Carousel Posts (recent commits)
 
 One carousel per commit, newest first. Each has a caption (post text) plus 6-8
 square slides. Slide 1 is the hook, the last slide is always the CTA. Square
@@ -6,7 +6,41 @@ canvas is 1080x1080.
 
 ---
 
-## 1. Keyblind is now a Claude Code skill
+## 1. Human approval for agent secret writes
+
+**Commit:** `e4d6934` — agent action approval workflows (human-in-the-loop)
+
+**Caption:**
+
+Keyblind v0.9.0 is out.
+
+The headline: agents no longer write secrets unchecked. When approval is
+required, an agent's store or delete is queued as "pending" instead of
+executing — the human sponsor approves or denies it from the CLI or dashboard.
+
+Approval is human-only by design: an agent can never sign off on its own
+action. Reads are never gated, only writes.
+
+The rest: 27 MCP tools, 7 backends, fully local, zero network. Open source, MIT.
+
+Would you let an agent write to your vault without a human in the loop?
+
+`#keyblind #aisecurity #humanintheloop #mcp #buildinpublic`
+
+**Slides:**
+
+1. **v0.9.0 is live** — agents now ask permission before writing secrets.
+2. **The gap** — agents could be denied, or allowed immediately. Nothing in between.
+3. **Approvals** — a sensitive write is queued as "pending" until a human acts.
+4. **Encrypted at rest** — the held value is vault-encrypted, never plaintext on disk.
+5. **Human-only** — an agent can never approve its own action; only writes are gated.
+6. **Resolve it anywhere** — `keyblind approvals approve <id>` or the dashboard Approvals page.
+7. **The rest** — 27 MCP tools, 7 backends, zero network, MIT.
+8. **Try it** — `npm i -g keyblind` then `keyblind quickstart`.
+
+---
+
+## 2. Keyblind is now a Claude Code skill
 
 **Commit:** `48887b3` — add keyblind skill and migrate manifest to v0.4
 
@@ -40,7 +74,7 @@ Are you shipping skills for your MCP tools yet?
 
 ---
 
-## 2. One-click install from the Smithery registry
+## 3. One-click install from the Smithery registry
 
 **Commit:** `2f310ba` — update smithery.yaml to current format
 
@@ -71,7 +105,7 @@ infrastructure.
 
 ---
 
-## 3. Repositioned for the agentic era
+## 4. Repositioned for the agentic era
 
 **Commit:** `004f729` — refresh distribution metadata and positioning
 
@@ -105,7 +139,7 @@ Which one-liner lands better with you:
 
 ---
 
-## 4. v0.8.8 shipped
+## 5. v0.8.8 shipped
 
 **Commit:** `9544653` — bump version to 0.8.8
 
@@ -136,7 +170,7 @@ Open source, MIT. 27 tools. Zero network.
 
 ---
 
-## 5. Team-wide editor config in one command
+## 6. Team-wide editor config in one command
 
 **Commit:** `8c68941` — add `setup-mcp --local` for project editor configs
 
@@ -170,7 +204,7 @@ That's the shift I care about: move secret hygiene from "someone remembered" to
 
 ---
 
-## 6. Cline and Zed join the party
+## 7. Cline and Zed join the party
 
 **Commit:** `5a49018` — extend setup-mcp to configure Cline and Zed
 
@@ -200,7 +234,7 @@ Which editor do you want to see next?
 
 ---
 
-## 7. From zero to vault in one command
+## 8. From zero to vault in one command
 
 **Commit:** `e468820` — add `keyblind quickstart` one-command onboarding
 
@@ -231,7 +265,7 @@ That's the whole design philosophy: security that's too easy to skip.
 
 ---
 
-## 8. Zero production vulnerabilities
+## 9. Zero production vulnerabilities
 
 **Commit:** `96d1991` — pin transitive deps to patched versions (zero prod audit)
 
@@ -262,7 +296,7 @@ Trust is earned in the supply chain, one pinned version at a time.
 
 ---
 
-## 9. I deleted a feature on purpose
+## 10. I deleted a feature on purpose
 
 **Commit:** `771d12a` — remove Let's Encrypt/HTTPS feature and acme-client dependency
 
@@ -294,7 +328,7 @@ Sometimes the best security feature is the one you remove.
 
 ---
 
-## 10. Docs that reflect reality
+## 11. Docs that reflect reality
 
 **Commit:** `5daf174` — reflect that setup-mcp now configures Cline and Zed
 
