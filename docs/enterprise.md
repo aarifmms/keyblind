@@ -43,11 +43,13 @@ is the defining enterprise gap and the roadmap below is built around it.
 1. **No *centralized* control plane.** Phase 1 (`keyblind control-plane`) shipped a
    *synchronized* spine: a signed, value-free export for org-wide visibility and a
    signed deny list for central revocation, shared via a git repo or object store.
-   What remains is true centralization — a hosted, real-time control plane with no
-   manual export/apply step.
+   Phase 2a is landing a hosted control plane (Turso-backed, signed manifest) that
+   removes the manual export/apply step; revocation is eventually-consistent via
+   `control-plane sync` rather than real-time.
 2. **No real RBAC or directory integration.** Team vaults are gated by a shared
-   passphrase; agent identity is a name/email string. SSO today only wraps
-   team-vault access. No SCIM, no group-based access control.
+   passphrase; agent identity is a name/email string. Phase 2a adds orgs, roles,
+   and group→scope grants, but SSO/OIDC login, SCIM, and short-lived signed
+   credentials are still outstanding.
 3. **Rotation is still manual.** `rotate --generate` prints a value you apply by
    hand; `rotate --exec` is provider-agnostic but you wire the command. True
    automated rotation (calling provider IAM/service-account APIs) is not done.
@@ -92,7 +94,7 @@ generates the org Ed25519 keypair; member machines `control-plane trust <pubkey>
 signed deny list of revoked agent IDs is enforced at the same choke point as agent scope
 (read *and* write). The shared store is transport-agnostic — no hosted aggregator yet.
 
-### Phase 2 — Identity and RBAC
+### Phase 2 — Identity and RBAC 🚧 in progress
 
 Replace shared-passphrase team vaults with real identity:
 
@@ -101,6 +103,28 @@ Replace shared-passphrase team vaults with real identity:
 - Short-lived, signed credentials for CI/CD and agents.
 
 **Exit criteria:** a leaver's access is revoked in one place and propagates.
+
+**Phase 2a (RBAC core) is in progress**: a hosted control plane (extending the
+`hosted/` app) backed by **Turso/libSQL**, with orgs, members, `owner`/`admin`/
+`member` roles, groups, and a group→scope mapping. The hosted service signs a
+**manifest bundle** (deny list + group-derived agent scopes) with the org's
+Ed25519 key; local vaults `keyblind control-plane sync` it, verify the signature,
+and enforce group-based access at the same choke point as agent scope. Revoking
+an agent (or changing a group) in the hosted dashboard propagates to local
+vaults on the next `sync` for read *and* write, from one place.
+
+Two design notes worth flagging:
+
+- **The hosted service holds the org signing key.** Real-time revocation requires
+  the server to sign manifests on demand, so the org Ed25519 private key is
+  generated server-side and stored AES-256-GCM-encrypted at rest under a server
+  secret (`CONTROL_PLANE_KEY_ENC_KEY`). Member machines hold only the public key.
+  This is a deliberate centralization tradeoff, not a hidden one.
+- **SSO login and short-lived signed agent credentials are the remaining Phase 2
+  work.** This cut's hosted auth is still license-key-as-identity (extended with
+  `userId`/`orgId`/`role`). Raw OIDC on `src/sso.ts` (Google/Okta/Azure presets
+  already exist) slots into the same session shape next; short-lived, nonce-bound
+  agent credentials replace today's replayable signed requests after that.
 
 ### Phase 3 — Automated rotation
 

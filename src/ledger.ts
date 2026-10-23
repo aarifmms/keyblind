@@ -124,7 +124,22 @@ function getDb(): Database.Database {
     CREATE TABLE IF NOT EXISTS revoked_agents (
       agent_id TEXT PRIMARY KEY,
       reason TEXT NOT NULL DEFAULT '',
-      revoked_at TEXT NOT NULL DEFAULT (datetime('now'))
+      revoked_at TEXT NOT NULL DEFAULT (datetime('now')),
+      source TEXT NOT NULL DEFAULT 'local'
+    )
+  `);
+  // Migrate pre-Phase-2 revoked_agents tables (which lack the source column).
+  const revokedCols = _db.prepare("PRAGMA table_info(revoked_agents)").all() as { name: string }[];
+  if (!revokedCols.some((c) => c.name === "source")) {
+    _db.exec("ALTER TABLE revoked_agents ADD COLUMN source TEXT NOT NULL DEFAULT 'local'");
+  }
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS group_grants (
+      org_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT '',
+      synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(org_id, agent_id)
     )
   `);
   return _db;
@@ -238,7 +253,8 @@ export function authorizeAction(agentId: string, action: "read" | "write", targe
   if (!agent) return "Unknown agent";
   if (isAgentRevoked(agentId)) return "Agent revoked";
   if (!verifyAgentSignature(agentId, action, target, signatureB64)) return "Invalid agent signature";
-  if (!scopeMatches(agent.scope, action, target)) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
+  const groupAllowed = getGroupScopes(agentId).some((g) => scopeMatches(g, action, target));
+  if (!scopeMatches(agent.scope, action, target) && !groupAllowed) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
   const policy = getSecretPolicy(target);
   if (policy !== "" && !policyMatches(policy, action, agent.name)) {
     return `Denied by per-secret policy for "${target}"`;
@@ -303,8 +319,9 @@ export function listSecretPolicies(): { secret: string; policy: string }[] {
 export function filterReadableSecrets(agentId: string, secrets: string[]): string[] {
   const agent = getAgent(agentId);
   if (!agent) return [];
+  const groupScopes = getGroupScopes(agentId);
   return secrets.filter((name) => {
-    if (!scopeMatches(agent.scope, "read", name)) return false;
+    if (!scopeMatches(agent.scope, "read", name) && !groupScopes.some((g) => scopeMatches(g, "read", name))) return false;
     const policy = getSecretPolicy(name);
     if (policy !== "" && !policyMatches(policy, "read", agent.name)) return false;
     return true;
@@ -336,6 +353,59 @@ export function listRevokedAgents(): { agentId: string; reason: string; revokedA
 export function isAgentRevoked(agentId: string): boolean {
   const db = getDb();
   return db.prepare("SELECT 1 FROM revoked_agents WHERE agent_id = ?").get(agentId) !== undefined;
+}
+
+// Reconciles the org's deny list into the local revocation table. Rows this org
+// previously synced (source "org:<orgId>") that are absent from the incoming
+// list are removed, so un-revoking an agent propagates. Local (source "local")
+// revocations are untouched.
+export function replaceOrgRevocations(orgId: string, entries: { agentId: string; reason?: string }[]): number {
+  const db = getDb();
+  const source = `org:${orgId}`;
+  const upsert = db.prepare(
+    "INSERT INTO revoked_agents (agent_id, reason, source) VALUES (?, ?, ?) ON CONFLICT(agent_id) DO UPDATE SET reason = excluded.reason, source = excluded.source",
+  );
+  const incoming = new Set<string>();
+  for (const e of entries) {
+    if (!e || typeof e.agentId !== "string") continue;
+    incoming.add(e.agentId);
+    upsert.run(e.agentId, typeof e.reason === "string" ? e.reason : "", source);
+  }
+  const del = db.prepare("DELETE FROM revoked_agents WHERE source = ? AND agent_id = ?");
+  const existing = db.prepare("SELECT agent_id FROM revoked_agents WHERE source = ?").all(source) as { agent_id: string }[];
+  for (const row of existing) {
+    if (!incoming.has(row.agent_id)) del.run(source, row.agent_id);
+  }
+  return incoming.size;
+}
+
+// ── Group grants ──────────────────────────────────────────────────────────────
+//
+// A synced org manifest contributes per-agent group-derived scope. These grants
+// are UNIONed with the agent's own local scope in authorizeAction, so a group
+// can grant access a personal scope does not; only the deny list removes access.
+
+export function getGroupScopes(agentId: string): string[] {
+  const db = getDb();
+  return (db.prepare("SELECT scope FROM group_grants WHERE agent_id = ?").all(agentId) as { scope: string }[]).map((r) => r.scope);
+}
+
+export function replaceOrgGrants(orgId: string, grants: { agentId: string; scope?: string }[]): number {
+  const db = getDb();
+  db.prepare("DELETE FROM group_grants WHERE org_id = ?").run(orgId);
+  const insert = db.prepare("INSERT INTO group_grants (org_id, agent_id, scope) VALUES (?, ?, ?)");
+  let n = 0;
+  for (const g of grants) {
+    if (!g || typeof g.agentId !== "string") continue;
+    insert.run(orgId, g.agentId, typeof g.scope === "string" ? g.scope : "");
+    n++;
+  }
+  return n;
+}
+
+export function listGroupGrants(): { orgId: string; agentId: string; scope: string; syncedAt: string }[] {
+  const db = getDb();
+  return db.prepare("SELECT org_id AS orgId, agent_id AS agentId, scope, synced_at AS syncedAt FROM group_grants ORDER BY org_id, agent_id").all() as { orgId: string; agentId: string; scope: string; syncedAt: string }[];
 }
 
 // ── Mandatory enforcement flag ───────────────────────────────────────────────

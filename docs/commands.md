@@ -183,7 +183,28 @@ keyblind control-plane trusted            # List trusted org public keys
 keyblind control-plane apply <file>       # Import a signed deny list (revoked agents)
 keyblind control-plane revoke <agentId> [reason]  # Revoke an agent locally (then export)
 keyblind control-plane unrevoke <agentId>        # Un-revoke an agent locally
+keyblind control-plane connect <url>      # Connect to a hosted control plane (org API base)
+keyblind control-plane sync               # Pull + apply the signed manifest (deny list + group grants)
+keyblind control-plane disconnect         # Forget the hosted control-plane connection
+keyblind control-plane status             # Show the current connection (if any)
 ```
+
+### Hosted control plane (Phase 2a)
+
+`connect`, `sync`, `disconnect`, and `status` wire a local vault to the hosted control
+plane. `connect <url>` fetches the org's `/well-known` identity, trusts its Ed25519 public
+key out-of-band, and persists the connection under `~/.keyblind/connection.json`. `sync`
+pulls the signed manifest, verifies its signature against the trusted org key, and
+reconciles two things into the local ledger:
+
+- **Deny list**: revoked agent IDs (tagged `org:<orgId>`), so an agent is denied read
+  *and* write until un-revoked.
+- **Group grants**: per-agent group-derived scope, unioned with each agent's local scope
+  so a group can grant access a personal scope does not.
+
+Sync is **reconciliation, not append**: agents removed from the deny list or a group are
+un-revoked / un-granted locally on the next `sync`. There are no per-request hosted calls in
+the secret path; revocation is eventually-consistent, applied when you `sync`.
 
 The export is **value-free** — it carries secret names and rotation age, agent identities
 and scopes, per-secret policies, approvals, and the full agent ledger with its integrity

@@ -139,6 +139,9 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - Agent action approvals (approve/deny queued agent writes)
 - Central control plane (org-wide visibility + signed revocation)
 
+A hosted control plane (`hosted/`) adds orgs, roles, groups, and a signed
+revocation + group-scope manifest. See `docs/enterprise.md` (Phase 2a).
+
 ## Browser Extension
 
 The **Keyblind Chrome Extension** detects and blocks secrets from being pasted into AI chat interfaces (Claude.ai, ChatGPT, Copilot).
@@ -305,6 +308,10 @@ keyblind control-plane trusted  List trusted org public keys
 keyblind control-plane apply <file>  Import a signed deny list (revoked agents)
 keyblind control-plane revoke <agentId> [reason]  Revoke an agent locally
 keyblind control-plane unrevoke <agentId>  Un-revoke an agent locally
+keyblind control-plane connect <url>  Connect to a hosted control plane (org API base)
+keyblind control-plane sync   Pull + apply the signed manifest (deny list + group grants)
+keyblind control-plane disconnect  Forget the hosted control-plane connection
+keyblind control-plane status  Show the current connection (if any)
 keyblind scan-repo [--all]    Scan tracked files (or full history) for secrets
 keyblind setup-ci             Write a GitHub Actions secret-scan workflow
 keyblind ci export            Export an encrypted bundle for CI injection (Pro)

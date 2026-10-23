@@ -1,4 +1,5 @@
 import * as jose from "jose";
+import { cookies } from "next/headers";
 
 function getSecret(): Uint8Array {
   const secret =
@@ -16,6 +17,9 @@ export interface SessionUser {
   tier: string;
   licenseId: string;
   expiresAt: string;
+  userId?: string;
+  orgId?: string;
+  role?: string;
 }
 
 export async function createSessionToken(user: SessionUser): Promise<string> {
@@ -33,4 +37,15 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
   } catch {
     return null;
   }
+}
+
+// Reads the session from the request cookie and verifies it. Throws if there is
+// no valid session, so a route can `const user = await requireSession()`.
+export async function requireSession(): Promise<SessionUser> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("keyblind_token")?.value;
+  if (!token) throw new Error("Unauthorized");
+  const user = await verifySessionToken(token);
+  if (!user) throw new Error("Unauthorized");
+  return user;
 }

@@ -21,6 +21,7 @@ import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
 import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies, revokeAgent, unrevokeAgent, listRevokedAgents } from "./ledger.js";
 import { listApprovals, approveApproval, denyApproval, setApprovalRequirement, isApprovalRequired, requireApprovalFor, unrequireApprovalFor } from "./approvals.js";
 import { initControlPlane, exportControlPlane, applyDenyList, trustOrg, untrustOrg, listTrustedOrgs } from "./control-plane.js";
+import { connectOrg, disconnectOrg, getOrgConnection, syncOrg } from "./org-sync.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
@@ -139,6 +140,10 @@ Usage:
   keyblind control-plane apply <file>  Import a signed deny list (revoked agents)
   keyblind control-plane revoke <agentId> [reason]  Revoke an agent locally
   keyblind control-plane unrevoke <agentId>        Un-revoke an agent locally
+  keyblind control-plane connect <url>   Connect to a hosted control plane
+  keyblind control-plane sync            Pull and apply the signed org manifest
+  keyblind control-plane disconnect      Disconnect from the hosted control plane
+  keyblind control-plane status          Show hosted control-plane connection
   keyblind migrate <from> <to> Migrate secrets between backends
   keyblind alerts <url>      Configure Slack/Discord webhook alerts
   keyblind totp set <name>   Store a TOTP 2FA config (from otpauth:// URI)
@@ -1564,7 +1569,7 @@ async function main(): Promise<void> {
       case "control-plane": {
         const sub = args[1];
         if (!sub) {
-          console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke>");
+          console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|connect|sync|disconnect|status>");
           process.exit(1);
         }
         switch (sub) {
@@ -1669,8 +1674,50 @@ async function main(): Promise<void> {
             }
             break;
           }
+          case "connect": {
+            const url = args[2];
+            if (!url) {
+              console.error("Usage: keyblind control-plane connect <url>");
+              process.exit(1);
+            }
+            try {
+              const conn = await connectOrg(url);
+              console.log(`Connected to org ${conn.orgId}`);
+              console.log(`Org public key: ${conn.orgPublicKey}`);
+            } catch (err: any) {
+              console.error(`Connect failed: ${err.message}`);
+              process.exit(1);
+            }
+            break;
+          }
+          case "sync": {
+            try {
+              const result = await syncOrg();
+              console.log(`Synced: ${result.revoked} revoked, ${result.grants} group grant(s) applied.`);
+            } catch (err: any) {
+              console.error(`Sync failed: ${err.message}`);
+              process.exit(1);
+            }
+            break;
+          }
+          case "disconnect": {
+            disconnectOrg();
+            console.log("Disconnected from org.");
+            break;
+          }
+          case "status": {
+            const conn = getOrgConnection();
+            if (!conn) {
+              console.log("Not connected to an org.");
+            } else {
+              console.log(`Connected: ${conn.url}`);
+              console.log(`Org ID: ${conn.orgId}`);
+              console.log(`Org public key: ${conn.orgPublicKey}`);
+            }
+            break;
+          }
           default:
-            console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke>");
+            console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|connect|sync|disconnect|status>");
             process.exit(1);
         }
         break;

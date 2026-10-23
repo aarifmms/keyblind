@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, SESSION_MAX_AGE } from "@/lib/auth";
 import { verifyLicenseKey } from "@/lib/license";
+import { getOrCreateUser, getOrgForUser } from "@/lib/org";
 
 export async function POST(req: Request) {
   try {
@@ -17,11 +18,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid or expired license key" }, { status: 401 });
     }
 
+    const user = await getOrCreateUser(info.email);
+    const membership = await getOrgForUser(user.id);
+
     const token = await createSessionToken({
       email: info.email,
       tier: info.tier,
       licenseId: info.id,
       expiresAt: info.exp,
+      userId: user.id,
+      orgId: membership?.org.id,
+      role: membership?.role,
     });
 
     const res = NextResponse.json({

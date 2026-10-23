@@ -108,7 +108,7 @@ function isTrustedOrg(publicKeyB64: string): boolean {
 // Recursive, key-sorted JSON so that a signature is independent of key order
 // and stable across re-serialization. The signer and verifier both call this on
 // the document (minus the signature field).
-function canonicalize(value: unknown): string {
+export function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") {
     return JSON.stringify(value);
   }
@@ -125,7 +125,7 @@ function signPayload(payload: string, privateKeyB64: string): string {
   return crypto.sign(null, Buffer.from(payload, "utf8"), priv).toString("base64");
 }
 
-function verifyPayload(payload: string, signatureB64: string, publicKeyB64: string): boolean {
+export function verifyPayload(payload: string, signatureB64: string, publicKeyB64: string): boolean {
   try {
     const pub = crypto.createPublicKey({ key: Buffer.from(publicKeyB64, "base64"), format: "der", type: "spki" });
     return crypto.verify(null, Buffer.from(payload, "utf8"), pub, Buffer.from(signatureB64, "base64"));
