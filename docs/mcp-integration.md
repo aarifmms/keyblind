@@ -123,3 +123,8 @@ Add to `~/.config/zed/mcp.json`:
 | `deadman_status` | Check dead man's switch | none |
 | `deadman_checkin` | Check in to dead man's switch | none |
 | `sso_status` | Check SSO auth status | none |
+
+> **Approval gating:** when a human requires approval (`keyblind approvals require on|off`
+> or `require <secret>`), an agent-initiated `store_secret` / `delete_secret` returns a
+> `pending_approval` result instead of executing. The human resolves it via
+> `keyblind approvals approve <id>` or the dashboard. Reads are never gated.

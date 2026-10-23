@@ -151,6 +151,27 @@ keyblind policy list                              # List all per-secret policies
 Both must pass for an action to be authorized. An empty policy means no per-secret
 restriction — the agent's own scope alone applies.
 
+## Agent Action Approvals (human-in-the-loop)
+
+```bash
+keyblind approvals list                              # List pending approval requests
+keyblind approvals approve <id>                      # Approve and execute a pending request
+keyblind approvals deny <id>                         # Deny a pending request
+keyblind approvals require on|off                    # Require approval for all agent writes
+keyblind approvals require <secret>                  # Require approval for a specific secret
+keyblind approvals unrequire <secret>                # Stop requiring approval for a secret
+```
+
+When approval is required (global toggle or per-secret flag), an agent-initiated
+`store_secret` or `delete_secret` is queued as a pending request instead of executing.
+The held value is encrypted with the vault key at rest, and every request and decision is
+recorded in an append-only, hash-chained table in `ledger.db`. Approve or deny from the
+CLI above or from the dashboard `/approvals` page.
+
+Reads (`resolve_secret`, `list_secrets`) are never approval-gated — they remain
+scope-checked only. Approval is human-only by design: an agent cannot approve its own
+action.
+
 ## Secret Scanning / CI
 
 ```bash

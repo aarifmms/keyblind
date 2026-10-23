@@ -136,6 +136,7 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - License management (tier, email, expiry)
 - Pro/Team tier status
 - Per-secret access policies and rotation reminders
+- Agent action approvals (approve/deny queued agent writes)
 
 ## Browser Extension
 
@@ -282,8 +283,19 @@ keyblind rotate <name> --generate  Rotate with an auto-generated value
 keyblind rotate <name> --exec "<cmd>"  Rotate via an external command's stdout
 keyblind rotate --overdue [days]    Rotate all secrets past the threshold
 keyblind rotate-needed [days] List secrets not rotated in N days (default 90)
+keyblind agents list         List registered AI agents
+keyblind agents register <name> <sponsor> [scope]  Register an agent (prints signing key)
+keyblind agents verify       Verify agent ledger integrity
+keyblind agents export [json|csv]  Export compliance report
+keyblind agents enforce on|off  Require signed agent identity for secret access
 keyblind policy set <secret> <policy>  Restrict which agents may access a secret
 keyblind policy list          List per-secret policies
+keyblind approvals list       List pending approval requests
+keyblind approvals approve <id>  Approve and execute a pending request
+keyblind approvals deny <id>  Deny a pending request
+keyblind approvals require on|off  Require approval for all agent writes
+keyblind approvals require <secret>  Require approval for a specific secret
+keyblind approvals unrequire <secret>  Stop requiring approval for a secret
 keyblind scan-repo [--all]    Scan tracked files (or full history) for secrets
 keyblind setup-ci             Write a GitHub Actions secret-scan workflow
 keyblind ci export            Export an encrypted bundle for CI injection (Pro)
