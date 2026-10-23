@@ -69,6 +69,28 @@ After `keyblind setup-mcp` and restart, just ask naturally:
 
 Keyblind resolves secrets at runtime — the plaintext never appears in the conversation transcript. You'll see "Called keyblind (ctrl+o to expand)" instead of the actual value.
 
+## Approve Agent Actions
+
+By default, when an AI agent stores or deletes a secret, it happens immediately. You can require your sign-off first:
+
+```bash
+# Require approval for all agent writes
+keyblind approvals require on
+
+# Or just for a specific secret
+keyblind approvals require STRIPE_API_KEY
+```
+
+When an agent tries a gated write, it receives a "pending approval" result instead of executing. Review and resolve the request:
+
+```bash
+keyblind approvals list
+keyblind approvals approve <id>   # execute the queued write
+keyblind approvals deny <id>      # discard it
+```
+
+Approval is human-only — an agent can never approve its own action — and reading secrets is never gated. You can also approve or deny from the dashboard's Approvals page.
+
 ## Web Dashboard
 
 ```bash
