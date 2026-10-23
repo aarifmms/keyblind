@@ -11,8 +11,8 @@ const outDir = path.join(dashboardDir, "out");
 const destDir = path.join(root, "dist", "dashboard");
 
 if (!existsSync(path.join(dashboardDir, "node_modules"))) {
-  console.error("dashboard/node_modules not found. Run `cd dashboard && npm install` first.");
-  process.exit(1);
+  console.log("dashboard/node_modules missing — installing dashboard dependencies...");
+  execSync("npm install", { cwd: dashboardDir, stdio: "inherit" });
 }
 
 console.log("Building dashboard static export...");
