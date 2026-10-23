@@ -14,6 +14,26 @@ keyblind init
 
 You'll be prompted to create a passphrase. This passphrase encrypts your vault. **Do not lose it** — there is no recovery mechanism.
 
+## Upgrade to Pro
+
+The free tier works immediately after `keyblind init`: 5 secrets, all 7 backends, and all 27 MCP tools. No account or purchase needed.
+
+To unlock unlimited secrets plus team vaults, audit log, secret rotation, and CI/CD integration:
+
+1. Go to [keyblind.dev](https://keyblind.dev) and click **Get Pro**.
+2. Complete the Stripe checkout. Your license key is emailed to you and shown on the confirmation page.
+3. Activate it locally: `keyblind activate keyblind.xxx.yyy`
+
+The license key is your identity. There is no username or password.
+
+Check your status any time:
+
+```bash
+keyblind status
+```
+
+Or sign in at [app.keyblind.dev/login](https://app.keyblind.dev/login) with your license key to view your tier, email, and expiry.
+
 ## Connect to Claude Code
 
 ```bash
