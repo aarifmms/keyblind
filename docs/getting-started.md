@@ -116,4 +116,5 @@ The fakes are HMAC-SHA256 derived — same input always produces same output, so
 - [Full Command Reference](commands.md)
 - [MCP Tools Reference](mcp-integration.md)
 - [Security Model](security.md)
+- [Enterprise Readiness](enterprise.md)
 - [FAQ](faq.md)
