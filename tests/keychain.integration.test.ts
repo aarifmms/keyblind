@@ -8,6 +8,8 @@ import path from "node:path";
 // skipped everywhere else, so the existing ubuntu/macos CI jobs are unaffected.
 const state = vi.hoisted(() => ({ tmpDir: "" }));
 
+const origDisabled = process.env.KEYBLIND_DISABLE_KEYCHAIN;
+
 vi.mock("node:os", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:os")>();
   return {
@@ -21,9 +23,12 @@ import { keychainAvailable, keychainGet, keychainSet, keychainDelete } from "../
 
 beforeEach(() => {
   state.tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "keyblind-dpapi-it-"));
+  delete process.env.KEYBLIND_DISABLE_KEYCHAIN;
 });
 
 afterEach(() => {
+  if (origDisabled === undefined) delete process.env.KEYBLIND_DISABLE_KEYCHAIN;
+  else process.env.KEYBLIND_DISABLE_KEYCHAIN = origDisabled;
   fs.rmSync(state.tmpDir, { recursive: true, force: true });
 });
 
