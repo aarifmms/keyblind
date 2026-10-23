@@ -1,6 +1,7 @@
-# Product Hunt Launch — Keyblind v0.6.0
+# Product Hunt Update — Keyblind v0.9.0
 
-**Scheduled for:** Tuesday, June 9, 2026 — 12:01 AM PT
+**Original launch:** Tuesday, June 9, 2026 — 12:01 AM PT
+**This update:** v0.9.0 — human-in-the-loop approval for agent writes
 
 ---
 
@@ -40,58 +41,60 @@ Terminal showing `keyblind sandbox` output with deterministic fakes.
 Caption: "After sandboxing: deterministic HMAC-SHA256 fakes. Clean git diffs. Same fake every time."
 
 ### Image 3: Feature Grid
-Show the full feature set: vault, sandbox, TOTP, sharing, dead man's switch, team vaults, dashboard.
-Caption: "27 MCP tools, 7 backends (local, 1Password, Bitwarden, AWS, GCP, Azure, env), 40+ CLI commands."
+Show the full feature set: vault, sandbox, TOTP, sharing, dead man's switch, team vaults, dashboard, approvals.
+Caption: "27 MCP tools, 7 backends, 40+ CLI commands. Plus human-in-the-loop approval for agent writes."
 
 ### Image 4: Keyblind vs Cloak
 Comparison table from landing page.
 Caption: "Why Keyblind: MCP-native (not editor-specific), 27 tools vs 3, 7 backends vs 1, deterministic sandbox."
 
 ### Image 5: Web Dashboard
-Screenshot of the local dashboard (localhost:4318) showing sidebar, secrets list, and health indicator.
-Caption: "Web dashboard at localhost:4318. No login or pairing. Manage secrets, TOTP, sharing, team vaults."
+Screenshot of the local dashboard (localhost:4318) showing sidebar, secrets list, and the Approvals page.
+Caption: "Web dashboard at localhost:4318. No login or pairing. Manage secrets, TOTP, sharing, team vaults, approvals."
 
 ---
 
-## First Comment (post immediately after launch)
+## Update Post (maker update, post after v0.9.0 ships)
 
 ```
-Hey Product Hunt! I built Keyblind because AI coding tools reading .env
-files terrifies me.
+Since launching on Product Hunt in June, Keyblind has shipped a lot.
+v0.9.0 lands today with the last big gap in the Know Your Agent story:
+human-in-the-loop approvals.
 
-100,000+ LLM conversations with exposed secrets were found indexed by
-search engines. Every AI editor reads your project files — including .env.
+Agents no longer write secrets unchecked. When approval is required, an
+agent's store_secret / delete_secret is queued as "pending" instead of
+executing — the held value is encrypted at rest, and the human sponsor
+approves or denies it from the CLI or the dashboard. Approval is
+human-only by design: an agent can never sign off on its own action.
+Reads are never gated.
 
-Keyblind encrypts your secrets (AES-256-GCM, machine-identity-bound key),
-replaces .env values with deterministic fakes, and resolves real secrets
-at runtime. The AI never sees them.
+What's shipped since launch:
 
-What's shipped in v0.6.0 (just published today):
+- v0.9.0 — Agent action approvals (human-in-the-loop), hash-chained
+  approval ledger, dashboard Approvals page, hosted license login
+- v0.8.8 — One-command onboarding (`keyblind quickstart`) + multi-editor
+  MCP setup (Claude Code, Cline, Zed globally; Cursor/Windsurf/Copilot
+  via `setup-mcp --local`)
+- v0.8.0 — CI/CD secret injection (Pro), provider-agnostic secret
+  rotation (`keyblind rotate --exec`), repo secret scanning + CI workflow
+- 145 tests passing, zero production audit vulnerabilities, signed npm
+  provenance via staged publishing
 
-- 27 MCP tools — secrets, sandbox, TOTP, secret sharing, dead man's
-  switch, team vaults, SSO, audit log, agent ledger, alerts
-- 7 backends — local, 1Password, Bitwarden, env, AWS, GCP, Azure
-- 40+ CLI commands
-- Web dashboard served locally (localhost:4318) — no login, no pairing
-- Chrome extension (paste interception on AI chat sites)
-- Browser auto-open on `keyblind dashboard`
-- Terraform provider (skeleton, Go)
-
-Key differentiator from Cloak (launched last week): Keyblind is MCP-
-native — works with every AI editor, not just VS Code. 7 backends vs 1.
-Deterministic sandbox vs random placeholders.
+Key differentiator from Cloak: Keyblind is MCP-native — works with every
+AI editor, not just VS Code. 7 backends vs 1. Deterministic sandbox vs
+random placeholders. Plus a human-in-the-loop approval layer Cloak
+doesn't have.
 
 Pricing:
 - Free: 5 secrets, all 7 backends, all 27 MCP tools
 - Pro ($79/year): Unlimited secrets, team vaults, audit log, CI/CD,
   secret rotation, biometric gate, cloud backends
-- PH2025 code = 50% off Pro first year
 
 Stack: TypeScript, SQLite (better-sqlite3), Node.js crypto. Zero network,
 zero telemetry, zero accounts. MIT licensed.
 
-Just dogfooded Keyblind to publish itself to npm — stored the publish token
-in the vault, ran `keyblind run -- npm publish`. It works.
+Just dogfooded Keyblind to publish itself to npm — stored the publish
+token in the vault, ran `keyblind run -- npm publish`. It works.
 
 Ask me anything!
 ```
@@ -100,13 +103,10 @@ Ask me anything!
 
 ## Launch Checklist
 
-- [ ] Create Product Hunt account or claim maker profile at producthunt.com
-- [ ] Upload thumbnail (`demo/thumbnail.png`)
-- [ ] Create 5 gallery screenshots (use `demo/screenshot-*.html` or terminal screenshots)
-- [ ] Fill in tagline, description, topics, URL
-- [ ] Schedule for Tuesday June 9, 12:01 AM PT
-- [ ] Copy first comment (ready above)
-- [ ] Post first comment immediately after launch goes live
+- [ ] Confirm maker profile / access to the existing Keyblind listing at producthunt.com
+- [ ] Write the update post (ready above)
+- [ ] Refresh gallery images if any screenshot is outdated
+- [ ] Post the update after v0.9.0 is live on npm
 - [ ] Share on Twitter/X and LinkedIn
-- [ ] Respond to every PH comment within first 4 hours (critical for ranking)
-- [ ] Add "Featured on Product Hunt" badge to landing page after launch
+- [ ] Respond to every PH comment within the first 4 hours
+- [ ] Add "Featured on Product Hunt" badge to landing page (if not already)
