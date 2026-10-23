@@ -57,6 +57,10 @@ export function closeLedger(): void {
   }
 }
 
+export function getLedgerDb(): Database.Database {
+  return getDb();
+}
+
 function getDb(): Database.Database {
   if (_db) return _db;
   const dbPath = _dbPath ?? path.join(os.homedir(), ".keyblind", "ledger.db");
@@ -91,6 +95,29 @@ function getDb(): Database.Database {
     CREATE TABLE IF NOT EXISTS secret_policies (
       secret TEXT PRIMARY KEY,
       policy TEXT NOT NULL DEFAULT ''
+    )
+  `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS approvals (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target TEXT NOT NULL,
+      value_encrypted BLOB,
+      value_iv BLOB,
+      value_auth_tag BLOB,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'pending',
+      requested_at TEXT NOT NULL DEFAULT (datetime('now')),
+      decided_at TEXT,
+      decided_by TEXT,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
+    )
+  `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS approval_required (
+      secret TEXT PRIMARY KEY
     )
   `);
   return _db;

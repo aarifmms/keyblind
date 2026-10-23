@@ -19,6 +19,7 @@ import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTr
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
 import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies } from "./ledger.js";
+import { listApprovals, approveApproval, denyApproval, setApprovalRequirement, isApprovalRequired, requireApprovalFor, unrequireApprovalFor } from "./approvals.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
@@ -103,6 +104,12 @@ Usage:
   keyblind policy set <secret> <policy>  Restrict which agents may read/write a secret
   keyblind policy clear <secret>    Remove a secret's per-secret policy
   keyblind policy list              List all per-secret policies
+  keyblind approvals list           List pending approval requests
+  keyblind approvals approve <id>   Approve and execute a pending request
+  keyblind approvals deny <id>      Deny a pending request
+  keyblind approvals require on|off  Require approval for all agent writes
+  keyblind approvals require <secret>  Require approval for a specific secret
+  keyblind approvals unrequire <secret>  Stop requiring approval for a secret
   keyblind team init [path]    Create a shared team vault (git-safe)
   keyblind team push <name>     Push a local secret to the team vault
   keyblind team pull            Import all team secrets to local vault
@@ -862,6 +869,90 @@ async function main(): Promise<void> {
           }
           default:
             console.error("Usage: keyblind policy <set|clear|list>");
+            process.exit(1);
+        }
+        break;
+      }
+
+      case "approvals": {
+        const sub = args[1];
+        if (!sub) {
+          console.error("Usage: keyblind approvals <list|approve|deny|require|unrequire>");
+          process.exit(1);
+        }
+        switch (sub) {
+          case "list": {
+            const approvals = listApprovals();
+            if (approvals.length === 0) {
+              console.log("No approval requests.");
+            } else {
+              for (const a of approvals) {
+                const decided = a.status === "pending" ? "" : `  ${a.status} by ${a.decidedBy || "?"} at ${a.decidedAt || ""}`;
+                console.log(`  ${a.id}  [${a.status}]  ${a.agentName} -> ${a.action} ${a.target}  (${a.requestedAt})${decided}`);
+              }
+            }
+            break;
+          }
+          case "approve": {
+            const id = args[2];
+            if (!id) {
+              console.error("Usage: keyblind approvals approve <id>");
+              process.exit(1);
+            }
+            try {
+              const result = approveApproval(id, "cli");
+              console.log(`Approved ${id}: executed ${result.action} on "${result.target}"`);
+            } catch (err: any) {
+              console.error(err.message);
+              process.exit(1);
+            }
+            break;
+          }
+          case "deny": {
+            const id = args[2];
+            if (!id) {
+              console.error("Usage: keyblind approvals deny <id>");
+              process.exit(1);
+            }
+            try {
+              denyApproval(id, "cli");
+              console.log(`Denied ${id}`);
+            } catch (err: any) {
+              console.error(err.message);
+              process.exit(1);
+            }
+            break;
+          }
+          case "require": {
+            const target = args[2];
+            if (!target) {
+              console.error("Usage: keyblind approvals require on|off|<secret>");
+              process.exit(1);
+            }
+            if (target === "on") {
+              setApprovalRequirement(true);
+              console.log("Approval required for all agent writes.");
+            } else if (target === "off") {
+              setApprovalRequirement(false);
+              console.log("Approval requirement disabled.");
+            } else {
+              requireApprovalFor(target);
+              console.log(`Approval required for "${target}"`);
+            }
+            break;
+          }
+          case "unrequire": {
+            const secret = args[2];
+            if (!secret) {
+              console.error("Usage: keyblind approvals unrequire <secret>");
+              process.exit(1);
+            }
+            unrequireApprovalFor(secret);
+            console.log(`Approval no longer required for "${secret}"`);
+            break;
+          }
+          default:
+            console.error("Usage: keyblind approvals <list|approve|deny|require|unrequire>");
             process.exit(1);
         }
         break;

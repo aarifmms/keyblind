@@ -2,7 +2,7 @@ import { readConfig } from "./config.js";
 
 interface WebhookConfig {
   url: string;
-  events: ("resolve" | "store" | "delete" | "rotate" | "expiry")[];
+  events: ("resolve" | "store" | "delete" | "rotate" | "expiry" | "approval_requested")[];
 }
 
 let _configs: WebhookConfig[] = [];
@@ -37,7 +37,7 @@ async function sendWebhook(url: string, payload: Record<string, any>): Promise<b
 }
 
 export async function fireAlert(
-  event: "resolve" | "store" | "delete" | "rotate" | "expiry",
+  event: "resolve" | "store" | "delete" | "rotate" | "expiry" | "approval_requested",
   secretName: string,
   metadata?: Record<string, any>
 ): Promise<void> {
@@ -66,6 +66,7 @@ export function formatSlackPayload(payload: Record<string, any>): Record<string,
     delete: ":wastebasket:",
     rotate: ":arrows_counterclockwise:",
     expiry: ":warning:",
+    approval_requested: ":clipboard:",
   };
 
   return {
@@ -89,6 +90,7 @@ export function formatDiscordPayload(payload: Record<string, any>): Record<strin
     delete: 0xf85149,
     rotate: 0xd29922,
     expiry: 0xf0883e,
+    approval_requested: 0xa371f7,
   };
 
   return {

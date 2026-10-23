@@ -190,6 +190,25 @@ export class KeyblindClient {
     });
   }
 
+  // Approval workflow (human-in-the-loop)
+  async getApprovals(status?: string): Promise<any[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    const result = await this.rest(`/api/approvals${query}`);
+    return result.approvals || [];
+  }
+
+  async approveApproval(id: string): Promise<{ id: string; action: string; target: string; status: string }> {
+    return this.rest(`/api/approvals/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+    });
+  }
+
+  async denyApproval(id: string): Promise<{ id: string; status: string }> {
+    return this.rest(`/api/approvals/${encodeURIComponent(id)}/deny`, {
+      method: "POST",
+    });
+  }
+
   // TOTP
   async getTOTPConfigs(): Promise<TOTPConfig[]> {
     const result = await this.rest("/api/totp");

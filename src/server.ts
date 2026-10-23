@@ -17,6 +17,7 @@ import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
 import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets, listSecretPolicies, setSecretPolicy, clearSecretPolicy } from "./ledger.js";
+import { requestApproval, approvalRequiredFor, listApprovals, approveApproval, denyApproval } from "./approvals.js";
 import { getVersion } from "./version.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -189,6 +190,20 @@ export function createServer(): McpServer {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
+      if (agentId && approvalRequiredFor(name)) {
+        const { id } = requestApproval(agentId, "store_secret", name, value);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "pending_approval",
+              approval_id: id,
+              message: "Awaiting human approval. Run: keyblind approvals approve " + id,
+            }),
+          }],
+        };
+      }
+
       storeSecret(name, value);
       return {
         content: [{ type: "text", text: JSON.stringify({ stored: name, status: "encrypted_and_saved" }) }],
@@ -310,6 +325,20 @@ export function createServer(): McpServer {
       const deny = checkAgentAccess(agentId, signature, "write", name);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
+      }
+
+      if (agentId && approvalRequiredFor(name)) {
+        const { id } = requestApproval(agentId, "delete_secret", name);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "pending_approval",
+              approval_id: id,
+              message: "Awaiting human approval. Run: keyblind approvals approve " + id,
+            }),
+          }],
+        };
       }
 
       const deleted = deleteSecret(name);
@@ -818,6 +847,31 @@ export async function startHttpServer(port: number = 4318, host: string = "127.0
       });
       res.end(report);
       return;
+    }
+
+    // ── Approval workflow REST API ──
+    if (req.url === "/api/approvals" && req.method === "GET") {
+      const url = new URL(req.url, `http://localhost:${port}`);
+      const status = url.searchParams.get("status") || undefined;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ approvals: listApprovals(status) }));
+      return;
+    }
+
+    if (req.url?.startsWith("/api/approvals/") && req.method === "POST") {
+      const match = req.url.match(/^\/api\/approvals\/([^/]+)\/(approve|deny)$/);
+      if (match) {
+        const [, id, decision] = match;
+        try {
+          const result = decision === "approve" ? approveApproval(id, "dashboard") : denyApproval(id, "dashboard");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (err: any) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: err.message || "Invalid request" }));
+        }
+        return;
+      }
     }
 
     // ── TOTP REST API ──
