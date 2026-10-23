@@ -18,11 +18,9 @@ export async function GET(req: Request) {
   const redirectTo = (target: string) => NextResponse.redirect(new URL(target, url.origin), 303);
 
   try {
-    const providerId = url.searchParams.get("provider") ?? "";
     const code = url.searchParams.get("code") ?? "";
     const state = url.searchParams.get("state") ?? "";
-    const provider = getProvider(providerId);
-    if (!provider || !code || !state) return redirectTo("/login?error=sso-callback");
+    if (!code || !state) return redirectTo("/login?error=sso-callback");
 
     const cookieHeader = req.headers.get("cookie") ?? "";
     const stateCookie = cookieHeader
@@ -31,9 +29,14 @@ export async function GET(req: Request) {
       .find((c) => c.startsWith(`${STATE_COOKIE}=`));
     const stateToken = stateCookie ? stateCookie.slice(STATE_COOKIE.length + 1) : "";
     const oidcState = stateToken ? await verifyOidcState(stateToken) : null;
-    if (!oidcState || oidcState.provider !== providerId || oidcState.state !== state) {
+    if (!oidcState || oidcState.state !== state) {
       return redirectTo("/login?error=sso-state");
     }
+
+    // The provider id is carried in the signed state (the IdP redirects back
+    // with only `code` + `state`), so it is never trusted from the query string.
+    const provider = getProvider(oidcState.provider);
+    if (!provider) return redirectTo("/login?error=sso-callback");
 
     const { idToken, refreshToken } = await exchangeCode(provider, code, oidcState.codeVerifier, `${url.origin}/api/auth/sso/callback`);
     const claims = await verifyIdToken(provider, idToken, oidcState.nonce);

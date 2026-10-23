@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireSession, setActiveOrgCookie } from "@/lib/auth";
+import { setActiveOrgCookie } from "@/lib/auth";
 import { getOrgForUser } from "@/lib/org";
-import { ApiError } from "@/lib/org-auth";
+import { ApiError, requireUser } from "@/lib/org-auth";
 
 export async function POST(req: Request) {
   try {
-    const session = await requireSession();
+    const session = await requireUser();
     if (!session.userId) throw new ApiError("Unauthorized", 401);
     const body = (await req.json().catch(() => ({}))) as { orgId?: string };
     const orgId = typeof body.orgId === "string" ? body.orgId : "";

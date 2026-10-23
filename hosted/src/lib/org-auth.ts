@@ -25,3 +25,15 @@ export async function requireOrgRole(roles: Role[]): Promise<{ user: SessionUser
 
   return { user, org: membership.org, role: membership.role };
 }
+
+// requireSession, but an auth failure surfaces as a 401 ApiError instead of the
+// plain Error that requireSession throws. Used by org routes outside the
+// middleware matcher (e.g. /api/orgs) that must return 401, not 500, when
+// unauthenticated or revoked.
+export async function requireUser(): Promise<SessionUser> {
+  try {
+    return await requireSession();
+  } catch {
+    throw new ApiError("Unauthorized", 401);
+  }
+}

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
 import { listOrgsForUser } from "@/lib/org";
-import { ApiError } from "@/lib/org-auth";
+import { ApiError, requireUser } from "@/lib/org-auth";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireUser();
     if (!session.userId) throw new ApiError("Unauthorized", 401);
     const orgs = await listOrgsForUser(session.userId);
     return NextResponse.json({ orgs });
