@@ -137,6 +137,7 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - Pro/Team tier status
 - Per-secret access policies and rotation reminders
 - Agent action approvals (approve/deny queued agent writes)
+- Central control plane (org-wide visibility + signed revocation)
 
 ## Browser Extension
 
@@ -296,6 +297,14 @@ keyblind approvals deny <id>  Deny a pending request
 keyblind approvals require on|off  Require approval for all agent writes
 keyblind approvals require <secret>  Require approval for a specific secret
 keyblind approvals unrequire <secret>  Stop requiring approval for a secret
+keyblind control-plane init   Generate the org signing keypair
+keyblind control-plane export  Export a signed, value-free control-plane bundle
+keyblind control-plane trust <pubkey>  Trust an org public key (honor its deny list)
+keyblind control-plane untrust <pubkey>  Remove a trusted org public key
+keyblind control-plane trusted  List trusted org public keys
+keyblind control-plane apply <file>  Import a signed deny list (revoked agents)
+keyblind control-plane revoke <agentId> [reason]  Revoke an agent locally
+keyblind control-plane unrevoke <agentId>  Un-revoke an agent locally
 keyblind scan-repo [--all]    Scan tracked files (or full history) for secrets
 keyblind setup-ci             Write a GitHub Actions secret-scan workflow
 keyblind ci export            Export an encrypted bundle for CI injection (Pro)

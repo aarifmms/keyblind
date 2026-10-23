@@ -4,6 +4,29 @@ All notable changes to Keyblind are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-10-23
+
+### Added
+
+- **Central control plane (Phase 1).** A signed, value-free export and a signed
+  deny list that give the local, zero-network model a shared spine for org-wide
+  visibility and revocation.
+  - `keyblind control-plane init` — generate the org Ed25519 keypair.
+  - `keyblind control-plane export` — signed, value-free bundle (secret names +
+    rotation age, agent identities and scopes, policies, approvals, and the full
+    ledger with its integrity verdict; no secret values or ciphertext) for committing
+    to a git repo or object store as the read-only org view.
+  - `keyblind control-plane trust <pubkey>` / `untrust` / `trusted` — manage trusted
+    org public keys.
+  - `keyblind control-plane apply <file>` — import a signed deny list (revoked agents).
+  - `keyblind control-plane revoke <agentId>` / `unrevoke` — revoke an agent locally.
+  - Revocation is enforced at the same choke point as agent scope, denying read *and*
+    write for revoked agents. A deny list is honored only if its Ed25519 signature
+    verifies against a trusted org public key.
+- `listSecretInventory()` — lists every secret with its rotation age (names and
+  timestamps only), powering the export.
+- Dashboard REST surface: `/api/control-plane/*`.
+
 ## [0.9.0] - 2026-10-23
 
 ### Added
@@ -80,6 +103,7 @@ First tagged stable release with the full feature set: local encrypted vault, MC
 team vaults, CLI pairing, web dashboard, Chrome extension, sandboxing, TOTP, secret sharing,
 dead man's switch, SSO, and the Know Your Agent ledger.
 
+[0.9.1]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.1
 [0.9.0]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.0
 [0.8.8]: https://github.com/aarifmms/keyblind/releases/tag/v0.8.8
 [0.8.7]: https://github.com/aarifmms/keyblind/releases/tag/v0.8.7
