@@ -17,6 +17,7 @@ import { getSSOToken, isSSOAuthenticated } from "./sso.js";
 import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
 import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets, listSecretPolicies, setSecretPolicy, clearSecretPolicy } from "./ledger.js";
+import { authorizeToken, filterReadableByToken } from "./agent-token.js";
 import { requestApproval, approvalRequiredFor, listApprovals, approveApproval, denyApproval } from "./approvals.js";
 import { exportControlPlane, trustOrg, listTrustedOrgs } from "./control-plane.js";
 import { revokeAgent, unrevokeAgent } from "./ledger.js";
@@ -34,17 +35,26 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 // Returns a deny reason for a signed secret-access request, or null to allow.
 // When no agentId is supplied the call is unenforced (backwards compatible with
 // direct CLI / human use) unless mandatory enforcement is enabled, in which case
-// anonymous access is refused. Supplying agentId opts into signed scope checks.
+// anonymous access is refused. Supplying agentId opts into signed scope checks;
+// a token opts into the org-issued short-lived-credential path instead.
 function checkAgentAccess(
   agentId: string | undefined,
   signature: string | undefined,
   action: "read" | "write",
   target: string,
+  nonce?: string,
+  exp?: number,
+  token?: string,
 ): string | null {
+  if (token) {
+    return authorizeToken(token, action, target);
+  }
   if (!agentId) {
     return isAgentScopeRequired() ? "Agent identity required (agent scope enforcement is enabled)" : null;
   }
-  return authorizeAction(agentId, action, target, signature ?? "");
+  if (typeof nonce !== "string" || !nonce) return "nonce is required for agent access";
+  if (typeof exp !== "number" || !Number.isFinite(exp)) return "exp is required for agent access";
+  return authorizeAction(agentId, action, target, nonce, exp, signature ?? "");
 }
 
 // The dashboard static export ships next to the compiled server: dist/dashboard/.
@@ -139,9 +149,12 @@ export function createServer(): McpServer {
     {
       name: z.string().describe("The name of the secret to resolve (e.g., OPENAI_API_KEY, DATABASE_URL)"),
       agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
-      signature: z.string().optional().describe("Ed25519 signature over 'read:<name>' in base64 (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'read:<name>:<nonce>:<exp>' in base64 (optional)"),
+      nonce: z.string().optional().describe("Single-use nonce bound into the signature (required with agentId)"),
+      exp: z.number().optional().describe("Expiry epoch seconds bound into the signature (required with agentId)"),
+      token: z.string().optional().describe("Org-issued short-lived access token (alternative to agentId)"),
     },
-    async ({ name, agentId, signature }) => {
+    async ({ name, agentId, signature, nonce, exp, token }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
@@ -149,7 +162,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "read", name);
+      const deny = checkAgentAccess(agentId, signature, "read", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
@@ -177,9 +190,12 @@ export function createServer(): McpServer {
       name: z.string().describe("A unique name for the secret (e.g., OPENAI_API_KEY, DATABASE_URL)"),
       value: z.string().describe("The secret value to encrypt and store"),
       agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
-      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>' in base64 (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>:<nonce>:<exp>' in base64 (optional)"),
+      nonce: z.string().optional().describe("Single-use nonce bound into the signature (required with agentId)"),
+      exp: z.number().optional().describe("Expiry epoch seconds bound into the signature (required with agentId)"),
+      token: z.string().optional().describe("Org-issued short-lived access token (alternative to agentId)"),
     },
-    async ({ name, value, agentId, signature }) => {
+    async ({ name, value, agentId, signature, nonce, exp, token }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
@@ -187,7 +203,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "write", name);
+      const deny = checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
@@ -218,21 +234,33 @@ export function createServer(): McpServer {
     "List all stored secret names (names only — values are never revealed in this listing).",
     {
       agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
-      signature: z.string().optional().describe("Ed25519 signature over 'read:*' in base64 (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'read:*:<nonce>:<exp>' in base64 (optional)"),
+      nonce: z.string().optional().describe("Single-use nonce bound into the signature (required with agentId)"),
+      exp: z.number().optional().describe("Expiry epoch seconds bound into the signature (required with agentId)"),
+      token: z.string().optional().describe("Org-issued short-lived access token (alternative to agentId)"),
     },
-    async ({ agentId, signature }) => {
+    async ({ agentId, signature, nonce, exp, token }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: JSON.stringify({ secrets: [] }) }],
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "read", "*");
+      const names = listSecrets().filter((n) => !n.startsWith("_keyblind") && !n.startsWith("_totp") && !n.startsWith("__keyblind"));
+
+      if (token) {
+        const { error, secrets } = filterReadableByToken(token, names);
+        if (error) {
+          return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${error}` }) }], isError: true };
+        }
+        return { content: [{ type: "text", text: JSON.stringify({ secrets }) }] };
+      }
+
+      const deny = checkAgentAccess(agentId, signature, "read", "*", nonce, exp);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
 
-      const names = listSecrets().filter((n) => !n.startsWith("_keyblind") && !n.startsWith("_totp") && !n.startsWith("__keyblind"));
       const visible = agentId ? filterReadableSecrets(agentId, names) : names;
       return {
         content: [{ type: "text", text: JSON.stringify({ secrets: visible }) }],
@@ -314,9 +342,12 @@ export function createServer(): McpServer {
     {
       name: z.string().describe("The name of the secret to delete"),
       agentId: z.string().optional().describe("Agent ID for signed, scope-enforced access (optional)"),
-      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>' in base64 (optional)"),
+      signature: z.string().optional().describe("Ed25519 signature over 'write:<name>:<nonce>:<exp>' in base64 (optional)"),
+      nonce: z.string().optional().describe("Single-use nonce bound into the signature (required with agentId)"),
+      exp: z.number().optional().describe("Expiry epoch seconds bound into the signature (required with agentId)"),
+      token: z.string().optional().describe("Org-issued short-lived access token (alternative to agentId)"),
     },
-    async ({ name, agentId, signature }) => {
+    async ({ name, agentId, signature, nonce, exp, token }) => {
       if (!isInitialized()) {
         return {
           content: [{ type: "text", text: '{"error":"Keyblind vault not initialized. Run: keyblind init"}' }],
@@ -324,7 +355,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "write", name);
+      const deny = checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }

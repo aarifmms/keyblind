@@ -10,6 +10,13 @@ import path from "node:path";
 
 const GENESIS = crypto.createHash("sha256").update("keyblind-agent-ledger-genesis-v1").digest("hex");
 
+// Short-lived request credentials: a signed request carries a single-use nonce
+// and an absolute expiry (epoch seconds). The expiry must fall within a bounded
+// window so a captured signature can only be replayed for a few minutes at most.
+const NONCE_SKEW_SECONDS = 30;
+const NONCE_MAX_TTL_SECONDS = 300; // 5 minutes
+const NONCE_PRUNE_SECONDS = NONCE_MAX_TTL_SECONDS + NONCE_SKEW_SECONDS;
+
 let _db: Database.Database | null = null;
 let _dbPath: string | null = null;
 
@@ -142,6 +149,14 @@ function getDb(): Database.Database {
       PRIMARY KEY(org_id, agent_id)
     )
   `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS used_nonces (
+      agent_id TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      used_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(agent_id, nonce)
+    )
+  `);
   return _db;
 }
 
@@ -220,27 +235,40 @@ export function scopeMatches(scope: string, action: "read" | "write", target: st
   return false;
 }
 
-function requestPayload(action: string, target: string): string {
-  return `${action}:${target}`;
+function requestPayload(action: string, target: string, nonce: string, exp: number): string {
+  return `${action}:${target}:${nonce}:${exp}`;
 }
 
 // Signs a secret-access request with the agent's private key. The signature
-// binds the action + target, proving the caller holds this agent's identity.
-export function signRequest(privateKeyB64: string, action: string, target: string): string {
+// binds the action + target + nonce + expiry, so a captured signature cannot be
+// replayed beyond the nonce's single use and the expiry's bounded window.
+export function signRequest(privateKeyB64: string, action: string, target: string, nonce: string, exp: number): string {
   const priv = crypto.createPrivateKey({ key: Buffer.from(privateKeyB64, "base64"), format: "der", type: "pkcs8" });
-  return crypto.sign(null, Buffer.from(requestPayload(action, target)), priv).toString("base64");
+  return crypto.sign(null, Buffer.from(requestPayload(action, target, nonce, exp)), priv).toString("base64");
 }
 
 // Verifies a signed secret-access request against the agent's stored public key.
-export function verifyAgentSignature(agentId: string, action: string, target: string, signatureB64: string): boolean {
+export function verifyAgentSignature(agentId: string, action: string, target: string, nonce: string, exp: number, signatureB64: string): boolean {
   const agent = getAgent(agentId);
   if (!agent) return false;
   try {
     const pub = crypto.createPublicKey({ key: Buffer.from(agent.publicKey, "base64"), format: "der", type: "spki" });
-    return crypto.verify(null, Buffer.from(requestPayload(action, target)), pub, Buffer.from(signatureB64, "base64"));
+    return crypto.verify(null, Buffer.from(requestPayload(action, target, nonce, exp)), pub, Buffer.from(signatureB64, "base64"));
   } catch {
     return false;
   }
+}
+
+// Consumes a single-use nonce, returning false if it was already used. Rows
+// older than the max TTL are pruned opportunistically so the table stays small
+// while every accepted expiry still outlives its nonce.
+export function consumeNonce(agentId: string, nonce: string): boolean {
+  const db = getDb();
+  const res = db
+    .prepare("INSERT INTO used_nonces (agent_id, nonce) VALUES (?, ?) ON CONFLICT(agent_id, nonce) DO NOTHING")
+    .run(agentId, nonce);
+  db.prepare("DELETE FROM used_nonces WHERE used_at < datetime('now', ?)").run(`-${NONCE_PRUNE_SECONDS} seconds`);
+  return res.changes > 0;
 }
 
 // Checks an agent's scope and returns a deny reason, or null if allowed.
@@ -248,11 +276,15 @@ export function verifyAgentSignature(agentId: string, action: string, target: st
 // is indistinguishable from a valid-but-out-of-scope one at the call site.
 // A per-secret policy (when set) is an additional gate layered on top of the
 // agent's own scope: the agent must satisfy both.
-export function authorizeAction(agentId: string, action: "read" | "write", target: string, signatureB64: string): string | null {
+export function authorizeAction(agentId: string, action: "read" | "write", target: string, nonce: string, exp: number, signatureB64: string): string | null {
   const agent = getAgent(agentId);
   if (!agent) return "Unknown agent";
   if (isAgentRevoked(agentId)) return "Agent revoked";
-  if (!verifyAgentSignature(agentId, action, target, signatureB64)) return "Invalid agent signature";
+  if (!verifyAgentSignature(agentId, action, target, nonce, exp, signatureB64)) return "Invalid agent signature";
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(exp) || exp < now - NONCE_SKEW_SECONDS) return "Request expired";
+  if (exp > now + NONCE_MAX_TTL_SECONDS) return "Request expiry too far in the future";
+  if (!consumeNonce(agentId, nonce)) return "Nonce already used";
   const groupAllowed = getGroupScopes(agentId).some((g) => scopeMatches(g, action, target));
   if (!scopeMatches(agent.scope, action, target) && !groupAllowed) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
   const policy = getSecretPolicy(target);

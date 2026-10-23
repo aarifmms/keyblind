@@ -139,8 +139,9 @@ This starts the local server and opens `http://localhost:4318/` in your browser.
 - Agent action approvals (approve/deny queued agent writes)
 - Central control plane (org-wide visibility + signed revocation)
 
-A hosted control plane (`hosted/`) adds orgs, roles, groups, and a signed
-revocation + group-scope manifest. See `docs/enterprise.md` (Phase 2a).
+A hosted control plane (`hosted/`) adds orgs, roles, groups, a signed
+revocation + group-scope manifest, multi-provider SSO login, and short-lived
+agent credentials. See `docs/enterprise.md` (Phase 2).
 
 ## Browser Extension
 

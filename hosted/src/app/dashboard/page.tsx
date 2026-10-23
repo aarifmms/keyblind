@@ -12,11 +12,17 @@ export default async function DashboardPage() {
   const tierLabel =
     user.tier === "team" ? "Team" : user.tier === "pro" ? "Pro" : "Free";
 
-  const rows = [
-    { icon: Mail, label: "Email", value: user.email },
-    { icon: BadgeCheck, label: "License", value: user.licenseId },
-    { icon: Calendar, label: "Expires", value: user.expiresAt },
-  ];
+  const isSso = user.authMethod === "sso";
+  const rows = isSso
+    ? [
+        { icon: Mail, label: "Email", value: user.email },
+        { icon: BadgeCheck, label: "Auth", value: "SSO" },
+      ]
+    : [
+        { icon: Mail, label: "Email", value: user.email },
+        { icon: BadgeCheck, label: "License", value: user.licenseId ?? "" },
+        { icon: Calendar, label: "Expires", value: user.expiresAt ?? "" },
+      ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0d1117] p-4">
@@ -53,7 +59,7 @@ export default async function DashboardPage() {
             ))}
           </div>
 
-          <form action="/api/auth/signout" method="post">
+          <form action={isSso ? "/api/auth/sso/logout" : "/api/auth/signout"} method="post">
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 border border-[#30363d] text-[#c9d1d9] rounded-md py-2 text-sm hover:bg-[#21262d] transition-colors"

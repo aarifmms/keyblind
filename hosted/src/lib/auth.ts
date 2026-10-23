@@ -15,11 +15,14 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 export interface SessionUser {
   email: string;
   tier: string;
-  licenseId: string;
-  expiresAt: string;
+  licenseId?: string;
+  expiresAt?: string;
   userId?: string;
   orgId?: string;
   role?: string;
+  authMethod?: "license" | "sso";
+  oidcSub?: string;
+  issuer?: string;
 }
 
 export async function createSessionToken(user: SessionUser): Promise<string> {

@@ -71,6 +71,14 @@ async function runMigrate(): Promise<void> {
       revoked_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY(org_id, agent_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS user_identities (
+      issuer TEXT NOT NULL,
+      sub TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY(issuer, sub)
+    )`,
   ];
   await db.batch(statements, "write");
 }

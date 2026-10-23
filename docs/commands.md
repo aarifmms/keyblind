@@ -141,10 +141,17 @@ keyblind agents register <name> <sponsor> [scope] # Register an agent (prints it
 keyblind agents verify                            # Verify the ledger's hash chain + signatures
 keyblind agents export [json|csv]                 # Compliance report with sponsor attribution
 keyblind agents enforce on|off                    # Require signed agent identity for secret access
+keyblind agents sign <action> <target> --key <privateKey> [--ttl 300] [--nonce <uuid>]
 keyblind policy set <secret> <policy>             # Restrict which agents may read/write a secret
 keyblind policy clear <secret>                    # Remove a secret's per-secret policy
 keyblind policy list                              # List all per-secret policies
 ```
+
+`agents sign` mints a short-lived, nonce-bound signature over `action:target`. It
+prints `{ action, target, nonce, exp, signature }`; a caller passes `nonce`, `exp`,
+and `signature` to the MCP tools. Signatures are **single-use** (a nonce may not be
+replayed) and expire after `--ttl` seconds (default 300, capped at 300).
+
 
 `scope` grants an agent broad access (`*`, `read:prod-* write:prod-*`). A per-secret
 `policy` further constrains a single secret by **agent name** (`read:billing-*`, `*`).
@@ -215,6 +222,34 @@ is anyone overdue for rotation."
 Revocation is enforced at the same choke point as scope: once an agent ID appears in a
 trusted, signed deny list, it is denied read *and* write regardless of its scope. The deny
 list is honored only if its Ed25519 signature verifies against a trusted org public key.
+
+### Hosted SSO login (Phase 2b)
+
+The hosted dashboard supports multi-provider OIDC login alongside license keys. Configure
+one or more providers with the `OIDC_PROVIDERS` env var (a JSON array):
+
+```json
+[
+  { "id": "google", "name": "Google", "issuer": "https://accounts.google.com",
+    "clientId": "...", "clientSecret": "...", "allowedDomains": ["corp.com"] },
+  { "id": "okta", "name": "Okta", "issuer": "https://corp.okta.com/oauth2/default",
+    "clientId": "...", "clientSecret": "...",
+    "groupsClaim": "groups", "adminGroup": "keyblind-admins", "ownerGroup": "keyblind-owners" }
+]
+```
+
+Per-provider fields: `id`, `name`, `issuer`, `clientId`, `clientSecret`, optional
+`allowedDomains` (email-domain allowlist), `groupsClaim` (default `groups`), `adminGroup`,
+and `ownerGroup`. When a `groups` claim is present on an SSO user already in an org, the
+`ownerGroup`/`adminGroup` values promote the member role and the claim syncs hosted
+scope-groups.
+
+### Org-issued agent tokens (Phase 2b)
+
+`POST /api/org/agents/:agentId/token` mints a short-lived, org-signed access token
+(`keyblind-agent-token-v1`) carrying a scope grant, single-use `jti`, and bounded TTL.
+Local vaults verify it offline against the trusted org public key; pass the token as the
+`token` input to the MCP secret tools instead of `agentId`/`signature`/`nonce`/`exp`.
 
 ## Secret Scanning / CI
 

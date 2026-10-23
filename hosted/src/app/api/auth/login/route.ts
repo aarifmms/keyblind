@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       userId: user.id,
       orgId: membership?.org.id,
       role: membership?.role,
+      authMethod: "license",
     });
 
     const res = NextResponse.json({

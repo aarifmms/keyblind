@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import crypto from "node:crypto";
 import Database from "better-sqlite3";
 import {
   setLedgerPath,
@@ -41,6 +42,13 @@ afterAll(() => {
 
 function rawDb(): Database.Database {
   return new Database(dbPath);
+}
+
+function signedRequest(privateKey: string, action: string, target: string, opts: { nonce?: string; exp?: number } = {}) {
+  const nonce = opts.nonce ?? crypto.randomUUID();
+  const exp = opts.exp ?? Math.floor(Date.now() / 1000) + 60;
+  const signature = signRequest(privateKey, action, target, nonce, exp);
+  return { nonce, exp, signature };
 }
 
 describe("agent ledger", () => {
@@ -111,24 +119,46 @@ describe("agent ledger", () => {
 
   it("signs and verifies a request, rejecting tampering", () => {
     const { identity, privateKey } = registerAgent("scoped-agent", "eve@corp.com", "read:invoices");
-    const sig = signRequest(privateKey, "read", "invoices");
-    expect(verifyAgentSignature(identity.id, "read", "invoices", sig)).toBe(true);
-    expect(verifyAgentSignature(identity.id, "read", "payments", sig)).toBe(false);
-    expect(verifyAgentSignature(identity.id, "write", "invoices", sig)).toBe(false);
+    const { nonce, exp, signature } = signedRequest(privateKey, "read", "invoices");
+    expect(verifyAgentSignature(identity.id, "read", "invoices", nonce, exp, signature)).toBe(true);
+    expect(verifyAgentSignature(identity.id, "read", "payments", nonce, exp, signature)).toBe(false);
+    expect(verifyAgentSignature(identity.id, "write", "invoices", nonce, exp, signature)).toBe(false);
   });
 
   it("authorizes in-scope and denies out-of-scope actions", () => {
     const { identity, privateKey } = registerAgent("scoped-agent2", "frank@corp.com", "read:invoices");
-    const okSig = signRequest(privateKey, "read", "invoices");
-    expect(authorizeAction(identity.id, "read", "invoices", okSig)).toBeNull();
+    const ok = signedRequest(privateKey, "read", "invoices");
+    expect(authorizeAction(identity.id, "read", "invoices", ok.nonce, ok.exp, ok.signature)).toBeNull();
 
-    const outSig = signRequest(privateKey, "read", "payments");
-    expect(authorizeAction(identity.id, "read", "payments", outSig)).toMatch(/Out of scope/);
+    const out = signedRequest(privateKey, "read", "payments");
+    expect(authorizeAction(identity.id, "read", "payments", out.nonce, out.exp, out.signature)).toMatch(/Out of scope/);
 
-    expect(authorizeAction("nonexistent", "read", "invoices", okSig)).toBe("Unknown agent");
+    expect(authorizeAction("nonexistent", "read", "invoices", ok.nonce, ok.exp, ok.signature)).toBe("Unknown agent");
 
-    const badSig = signRequest(privateKey, "read", "invoices").slice(0, -4) + "AAAA";
-    expect(authorizeAction(identity.id, "read", "invoices", badSig)).toBe("Invalid agent signature");
+    const bad = signedRequest(privateKey, "read", "invoices");
+    const badSig = bad.signature.slice(0, -4) + "AAAA";
+    expect(authorizeAction(identity.id, "read", "invoices", bad.nonce, bad.exp, badSig)).toBe("Invalid agent signature");
+  });
+
+  it("rejects a replayed nonce", () => {
+    const { identity, privateKey } = registerAgent("replay-agent", "sponsor@corp.com", "read:*");
+    const nonce = crypto.randomUUID();
+    const exp = Math.floor(Date.now() / 1000) + 60;
+    const signature = signRequest(privateKey, "read", "SECRET", nonce, exp);
+
+    expect(authorizeAction(identity.id, "read", "SECRET", nonce, exp, signature)).toBeNull();
+    expect(authorizeAction(identity.id, "read", "SECRET", nonce, exp, signature)).toBe("Nonce already used");
+  });
+
+  it("rejects an expired request and an over-far-future expiry", () => {
+    const { identity, privateKey } = registerAgent("expiry-agent", "sponsor@corp.com", "read:*");
+    const now = Math.floor(Date.now() / 1000);
+
+    const past = signedRequest(privateKey, "read", "SECRET", { exp: now - 60 });
+    expect(authorizeAction(identity.id, "read", "SECRET", past.nonce, past.exp, past.signature)).toBe("Request expired");
+
+    const farFuture = signedRequest(privateKey, "read", "SECRET", { exp: now + 3600 });
+    expect(authorizeAction(identity.id, "read", "SECRET", farFuture.nonce, farFuture.exp, farFuture.signature)).toBe("Request expiry too far in the future");
   });
 
   it("toggles the mandatory enforcement flag", () => {
@@ -171,11 +201,11 @@ describe("per-secret access policies", () => {
     const other = registerAgent("other-1", "sponsor@corp.com", "read:*");
     setSecretPolicy("DB_PASSWORD", "read:billing-*");
 
-    const billingSig = signRequest(billing.privateKey, "read", "DB_PASSWORD");
-    expect(authorizeAction(billing.identity.id, "read", "DB_PASSWORD", billingSig)).toBeNull();
+    const billingSig = signedRequest(billing.privateKey, "read", "DB_PASSWORD");
+    expect(authorizeAction(billing.identity.id, "read", "DB_PASSWORD", billingSig.nonce, billingSig.exp, billingSig.signature)).toBeNull();
 
-    const otherSig = signRequest(other.privateKey, "read", "DB_PASSWORD");
-    expect(authorizeAction(other.identity.id, "read", "DB_PASSWORD", otherSig)).toMatch(/per-secret policy/);
+    const otherSig = signedRequest(other.privateKey, "read", "DB_PASSWORD");
+    expect(authorizeAction(other.identity.id, "read", "DB_PASSWORD", otherSig.nonce, otherSig.exp, otherSig.signature)).toMatch(/per-secret policy/);
   });
 
   it("filters list_secrets to readable secrets by scope and policy", () => {

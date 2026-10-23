@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const state = vi.hoisted(() => ({ tmpDir: "" }));
 
@@ -18,6 +19,13 @@ vi.mock("node:os", async (importOriginal) => {
 import { setLedgerPath, closeLedger, registerAgent, revokeAgent, unrevokeAgent, listRevokedAgents, isAgentRevoked, authorizeAction, signRequest } from "../src/ledger.js";
 import { initializeVault, storeSecret, listSecretInventory, closeDb } from "../src/vault.js";
 import { initControlPlane, getOrgPublicKey, trustOrg, untrustOrg, listTrustedOrgs, exportControlPlane, applyDenyList } from "../src/control-plane.js";
+
+function signedRequest(privateKey: string, action: string, target: string) {
+  const nonce = crypto.randomUUID();
+  const exp = Math.floor(Date.now() / 1000) + 60;
+  const signature = signRequest(privateKey, action, target, nonce, exp);
+  return { nonce, exp, signature };
+}
 
 beforeAll(() => {
   fs.mkdirSync(state.tmpDir, { recursive: true });
@@ -115,17 +123,19 @@ describe("exportControlPlane", () => {
 describe("revocation enforcement", () => {
   it("denies a revoked agent even with a valid scope and signature", () => {
     const { identity, privateKey } = registerAgent("bot", "sponsor@corp.com", "read:*");
-    const sig = signRequest(privateKey, "read", "SOME_SECRET");
 
-    expect(authorizeAction(identity.id, "read", "SOME_SECRET", sig)).toBeNull();
+    const ok = signedRequest(privateKey, "read", "SOME_SECRET");
+    expect(authorizeAction(identity.id, "read", "SOME_SECRET", ok.nonce, ok.exp, ok.signature)).toBeNull();
 
     revokeAgent(identity.id, "compromised");
     expect(isAgentRevoked(identity.id)).toBe(true);
-    expect(authorizeAction(identity.id, "read", "SOME_SECRET", sig)).toBe("Agent revoked");
+    const revoked = signedRequest(privateKey, "read", "SOME_SECRET");
+    expect(authorizeAction(identity.id, "read", "SOME_SECRET", revoked.nonce, revoked.exp, revoked.signature)).toBe("Agent revoked");
 
     unrevokeAgent(identity.id);
     expect(isAgentRevoked(identity.id)).toBe(false);
-    expect(authorizeAction(identity.id, "read", "SOME_SECRET", sig)).toBeNull();
+    const restored = signedRequest(privateKey, "read", "SOME_SECRET");
+    expect(authorizeAction(identity.id, "read", "SOME_SECRET", restored.nonce, restored.exp, restored.signature)).toBeNull();
   });
 
   it("lists revoked agents", () => {

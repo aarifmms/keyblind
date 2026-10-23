@@ -36,6 +36,12 @@ function signDoc(doc: unknown, privateKeyB64: string): string {
   return crypto.sign(null, Buffer.from(canonicalize(doc), "utf8"), priv).toString("base64");
 }
 
+function signedRequest(privateKey: string, action: string, target: string) {
+  const nonce = crypto.randomUUID();
+  const exp = Math.floor(Date.now() / 1000) + 60;
+  return { nonce, exp, signature: signRequest(privateKey, action, target, nonce, exp) };
+}
+
 function makeManifest(kp: { publicKey: string; privateKey: string }, opts: { orgId?: string; denyList?: unknown[]; agentScopes?: unknown[] } = {}) {
   const orgId = opts.orgId ?? "org-1";
   const doc = {
@@ -75,13 +81,13 @@ describe("group grants enforcement", () => {
     const { identity, privateKey } = registerAgent("bot", "sponsor@corp.com", "");
     replaceOrgGrants("org-1", [{ agentId: identity.id, scope: "read:prod-*" }]);
 
-    const readSig = signRequest(privateKey, "read", "prod-db");
-    const writeSig = signRequest(privateKey, "write", "prod-db");
-    const otherReadSig = signRequest(privateKey, "read", "dev-secret");
+    const readSig = signedRequest(privateKey, "read", "prod-db");
+    const writeSig = signedRequest(privateKey, "write", "prod-db");
+    const otherReadSig = signedRequest(privateKey, "read", "dev-secret");
 
-    expect(authorizeAction(identity.id, "read", "prod-db", readSig)).toBeNull();
-    expect(authorizeAction(identity.id, "write", "prod-db", writeSig)).toBe("Out of scope (agent scope: \"(none)\")");
-    expect(authorizeAction(identity.id, "read", "dev-secret", otherReadSig)).toBe("Out of scope (agent scope: \"(none)\")");
+    expect(authorizeAction(identity.id, "read", "prod-db", readSig.nonce, readSig.exp, readSig.signature)).toBeNull();
+    expect(authorizeAction(identity.id, "write", "prod-db", writeSig.nonce, writeSig.exp, writeSig.signature)).toBe("Out of scope (agent scope: \"(none)\")");
+    expect(authorizeAction(identity.id, "read", "dev-secret", otherReadSig.nonce, otherReadSig.exp, otherReadSig.signature)).toBe("Out of scope (agent scope: \"(none)\")");
   });
 
   it("includes group-granted names in filterReadableSecrets", () => {

@@ -94,7 +94,7 @@ generates the org Ed25519 keypair; member machines `control-plane trust <pubkey>
 signed deny list of revoked agent IDs is enforced at the same choke point as agent scope
 (read *and* write). The shared store is transport-agnostic — no hosted aggregator yet.
 
-### Phase 2 — Identity and RBAC 🚧 in progress
+### Phase 2 — Identity and RBAC
 
 Replace shared-passphrase team vaults with real identity:
 
@@ -104,7 +104,7 @@ Replace shared-passphrase team vaults with real identity:
 
 **Exit criteria:** a leaver's access is revoked in one place and propagates.
 
-**Phase 2a (RBAC core) is in progress**: a hosted control plane (extending the
+**Phase 2a (RBAC core)** — shipped: a hosted control plane (extending the
 `hosted/` app) backed by **Turso/libSQL**, with orgs, members, `owner`/`admin`/
 `member` roles, groups, and a group→scope mapping. The hosted service signs a
 **manifest bundle** (deny list + group-derived agent scopes) with the org's
@@ -113,18 +113,37 @@ and enforce group-based access at the same choke point as agent scope. Revoking
 an agent (or changing a group) in the hosted dashboard propagates to local
 vaults on the next `sync` for read *and* write, from one place.
 
+**Phase 2b (SSO login + short-lived agent credentials)** — shipped:
+
+- **Multi-provider SSO login** in the hosted app. Configure one or more OIDC
+  providers with the `OIDC_PROVIDERS` env var (a JSON array: `id`, `name`,
+  `issuer`, `clientId`, `clientSecret`, optional `allowedDomains`, `groupsClaim`,
+  `adminGroup`, `ownerGroup`); the login page renders a button per provider.
+  A server-side `jose` client handles discovery, PKCE S256, `nonce`, and
+  `id_token` verification against the provider JWKS. Identity is linked to a user
+  by `(issuer, sub)` (email fallback for first link) in a `user_identities`
+  table; an optional `groups` claim maps to hosted role (`owner`/`admin`) and
+  scope-groups on login.
+- **Short-lived agent credentials**, in both models:
+  - **Self-signed requests** are now nonce- and expiry-bound
+    (`action:target:nonce:exp`), single-use via a `used_nonces` table, and
+    rejected when expired or too far in the future. `keyblind agents sign`
+    mints one locally.
+  - **Org-issued access tokens** (`keyblind-agent-token-v1`) are minted by the
+    hosted control plane (`POST /api/org/agents/:id/token`) and verified offline
+    by local vaults against the trusted org public key, with a single-use `jti`
+    and a bounded TTL.
+
 Two design notes worth flagging:
 
-- **The hosted service holds the org signing key.** Real-time revocation requires
-  the server to sign manifests on demand, so the org Ed25519 private key is
+- **The hosted service holds the org signing key.** Real-time revocation and token
+  minting require the server to sign on demand, so the org Ed25519 private key is
   generated server-side and stored AES-256-GCM-encrypted at rest under a server
   secret (`CONTROL_PLANE_KEY_ENC_KEY`). Member machines hold only the public key.
   This is a deliberate centralization tradeoff, not a hidden one.
-- **SSO login and short-lived signed agent credentials are the remaining Phase 2
-  work.** This cut's hosted auth is still license-key-as-identity (extended with
-  `userId`/`orgId`/`role`). Raw OIDC on `src/sso.ts` (Google/Okta/Azure presets
-  already exist) slots into the same session shape next; short-lived, nonce-bound
-  agent credentials replace today's replayable signed requests after that.
+- **SSO does not auto-provision orgs.** An SSO user still joins an org via invite;
+  group→role/scope mapping applies within that org. Multi-org membership and IdP
+  end-session revocation remain deferred.
 
 ### Phase 3 — Automated rotation
 

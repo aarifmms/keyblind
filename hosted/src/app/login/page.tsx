@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Shield, ArrowRight } from "lucide-react";
 
@@ -8,8 +8,16 @@ function LoginForm() {
   const [licenseKey, setLicenseKey] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
   const searchParams = useSearchParams();
   const activated = searchParams.get("activated") === "1";
+
+  useEffect(() => {
+    fetch("/api/auth/providers")
+      .then((res) => res.json())
+      .then((data) => setProviders(Array.isArray(data.providers) ? data.providers : []))
+      .catch(() => setProviders([]));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +73,27 @@ function LoginForm() {
           </button>
         </form>
       </div>
+
+      {providers.length > 0 && (
+        <div className="mt-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-[#21262d]" />
+            <span className="text-xs text-[#8b949e]">or</span>
+            <div className="flex-1 h-px bg-[#21262d]" />
+          </div>
+          <div className="space-y-2">
+            {providers.map((p) => (
+              <a
+                key={p.id}
+                href={`/api/auth/sso/start?provider=${encodeURIComponent(p.id)}`}
+                className="w-full flex items-center justify-center gap-2 border border-[#30363d] text-[#c9d1d9] rounded-md py-2 text-sm font-medium hover:bg-[#21262d] transition-colors"
+              >
+                Continue with {p.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 text-center">
         <a

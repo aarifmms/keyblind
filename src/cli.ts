@@ -18,12 +18,13 @@ import { createShareLink, receiveShare } from "./share.js";
 import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger } from "./deadman.js";
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
-import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies, revokeAgent, unrevokeAgent, listRevokedAgents } from "./ledger.js";
+import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies, revokeAgent, unrevokeAgent, listRevokedAgents, signRequest } from "./ledger.js";
 import { listApprovals, approveApproval, denyApproval, setApprovalRequirement, isApprovalRequired, requireApprovalFor, unrequireApprovalFor } from "./approvals.js";
 import { initControlPlane, exportControlPlane, applyDenyList, trustOrg, untrustOrg, listTrustedOrgs } from "./control-plane.js";
 import { connectOrg, disconnectOrg, getOrgConnection, syncOrg } from "./org-sync.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { spawn, execSync } from "node:child_process";
 import readline from "node:readline";
 import { stdin, stdout } from "node:process";
@@ -103,6 +104,7 @@ Usage:
   keyblind agents verify       Verify agent ledger integrity
   keyblind agents export [json|csv]  Export compliance report
   keyblind agents enforce on|off  Require signed agent identity for secret access
+  keyblind agents sign <action> <target> --key <key>  Sign a short-lived secret-access request
   keyblind policy set <secret> <policy>  Restrict which agents may read/write a secret
   keyblind policy clear <secret>    Remove a secret's per-secret policy
   keyblind policy list              List all per-secret policies
@@ -778,7 +780,7 @@ async function main(): Promise<void> {
       case "agents": {
         const sub = args[1];
         if (!sub) {
-          console.error("Usage: keyblind agents <list|register|verify|export|enforce>");
+          console.error("Usage: keyblind agents <list|register|verify|export|enforce|sign>");
           process.exit(1);
         }
         switch (sub) {
@@ -834,8 +836,29 @@ async function main(): Promise<void> {
             }
             break;
           }
+          case "sign": {
+            const action = args[2];
+            const target = args[3];
+            const keyIdx = args.indexOf("--key");
+            const privateKey = keyIdx !== -1 ? args[keyIdx + 1] : undefined;
+            if (!action || !target || !privateKey) {
+              console.error("Usage: keyblind agents sign <action> <target> --key <privateKey> [--ttl <seconds>] [--nonce <n>]");
+              console.error("  action: read | write (e.g., read)");
+              console.error("  target: a secret name or glob (e.g., prod-api-key or *)");
+              console.error("  --key:  the agent's Ed25519 private key (base64)");
+              process.exit(1);
+            }
+            const ttlIdx = args.indexOf("--ttl");
+            const ttl = ttlIdx !== -1 ? parseInt(args[ttlIdx + 1], 10) || 300 : 300;
+            const nonceIdx = args.indexOf("--nonce");
+            const nonce = nonceIdx !== -1 ? args[nonceIdx + 1] : crypto.randomUUID();
+            const exp = Math.floor(Date.now() / 1000) + ttl;
+            const signature = signRequest(privateKey, action, target, nonce, exp);
+            console.log(JSON.stringify({ action, target, nonce, exp, signature }, null, 2));
+            break;
+          }
           default:
-            console.error("Usage: keyblind agents <list|register|verify|export|enforce>");
+            console.error("Usage: keyblind agents <list|register|verify|export|enforce|sign>");
             process.exit(1);
         }
         break;
