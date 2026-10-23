@@ -33,22 +33,26 @@ afterEach(() => {
 });
 
 describe.skipIf(process.platform !== "win32")("Windows DPAPI (real PowerShell)", () => {
-  it("round-trips a value through ProtectedData and deletes it", () => {
-    const account = `itest-${Date.now()}`;
+  it(
+    "round-trips a value through ProtectedData and deletes it",
+    () => {
+      const account = `itest-${Date.now()}`;
 
-    expect(keychainAvailable()).toBe(true);
+      expect(keychainAvailable()).toBe(true);
 
-    keychainSet(account, "dpapi-secret-value");
-    expect(keychainGet(account)).toBe("dpapi-secret-value");
+      keychainSet(account, "dpapi-secret-value");
+      expect(keychainGet(account)).toBe("dpapi-secret-value");
 
-    // The wrapped key is stored as a DPAPI-protected blob, not plaintext.
-    const dir = path.join(state.tmpDir, ".keyblind");
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".dpapi"));
-    expect(files.length).toBeGreaterThan(0);
-    const blob = fs.readFileSync(path.join(dir, files[0]), "utf-8");
-    expect(blob).not.toContain("dpapi-secret-value");
+      // The wrapped key is stored as a DPAPI-protected blob, not plaintext.
+      const dir = path.join(state.tmpDir, ".keyblind");
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith(".dpapi"));
+      expect(files.length).toBeGreaterThan(0);
+      const blob = fs.readFileSync(path.join(dir, files[0]), "utf-8");
+      expect(blob).not.toContain("dpapi-secret-value");
 
-    keychainDelete(account);
-    expect(keychainGet(account)).toBeNull();
-  });
+      keychainDelete(account);
+      expect(keychainGet(account)).toBeNull();
+    },
+    30000,
+  );
 });
