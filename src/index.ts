@@ -1,4 +1,4 @@
-export { initializeVault, storeSecret, resolveSecret, listSecrets, deleteSecret, isInitialized, getKey, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded } from "./vault.js";
+export { initializeVault, storeSecret, resolveSecret, listSecrets, deleteSecret, isInitialized, getKey, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded, listSecretInventory } from "./vault.js";
 export { createServer, startServer } from "./server.js";
 export { sandboxEnvFile, unsandboxEnvFile, getEnvBackups } from "./sandbox.js";
 export { setBackend, getBackend, listAvailableBackends, type SecretBackend } from "./backends.js";
@@ -16,6 +16,7 @@ export { createShareLink, receiveShare, parseTTL, type SharePayload } from "./sh
 export { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger, encryptKeyShard, getDeadmanConfig, type DeadmanConfig, type DeadmanStatus } from "./deadman.js";
 export { configureSSO, ssoLogin, ssoLogout, getSSOToken, isSSOAuthenticated, getSSOConfig, type SSOConfig, type SSOToken, type IDTokenClaims } from "./sso.js";
 export { setupAll, type SetupResult } from "./setup-mcp.js";
-export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, scopeMatches, signRequest, verifyAgentSignature, authorizeAction, isAgentScopeRequired, setAgentScopeRequirement, policyMatches, setSecretPolicy, clearSecretPolicy, getSecretPolicy, listSecretPolicies, filterReadableSecrets, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";
+export { registerAgent, recordAction, verify, listAgents, getAgent, listEntries, exportCompliance, setLedgerPath, closeLedger, scopeMatches, signRequest, verifyAgentSignature, authorizeAction, isAgentScopeRequired, setAgentScopeRequirement, policyMatches, setSecretPolicy, clearSecretPolicy, getSecretPolicy, listSecretPolicies, filterReadableSecrets, revokeAgent, unrevokeAgent, listRevokedAgents, isAgentRevoked, type AgentIdentity, type RegistrationResult, type LedgerEntry, type VerificationResult } from "./ledger.js";
 export { requestApproval, listApprovals, approveApproval, denyApproval, approvalRequiredFor, isApprovalRequired, setApprovalRequirement, requireApprovalFor, unrequireApprovalFor, listApprovalRequired, pendingApprovalCount, type Approval } from "./approvals.js";
+export { initControlPlane, getOrgPublicKey, trustOrg, untrustOrg, listTrustedOrgs, exportControlPlane, applyDenyList } from "./control-plane.js";
 export { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection, type CiSecret } from "./ci.js";

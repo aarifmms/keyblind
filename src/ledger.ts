@@ -120,6 +120,13 @@ function getDb(): Database.Database {
       secret TEXT PRIMARY KEY
     )
   `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS revoked_agents (
+      agent_id TEXT PRIMARY KEY,
+      reason TEXT NOT NULL DEFAULT '',
+      revoked_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
   return _db;
 }
 
@@ -229,6 +236,7 @@ export function verifyAgentSignature(agentId: string, action: string, target: st
 export function authorizeAction(agentId: string, action: "read" | "write", target: string, signatureB64: string): string | null {
   const agent = getAgent(agentId);
   if (!agent) return "Unknown agent";
+  if (isAgentRevoked(agentId)) return "Agent revoked";
   if (!verifyAgentSignature(agentId, action, target, signatureB64)) return "Invalid agent signature";
   if (!scopeMatches(agent.scope, action, target)) return `Out of scope (agent scope: "${agent.scope || "(none)"}")`;
   const policy = getSecretPolicy(target);
@@ -301,6 +309,33 @@ export function filterReadableSecrets(agentId: string, secrets: string[]): strin
     if (policy !== "" && !policyMatches(policy, "read", agent.name)) return false;
     return true;
   });
+}
+
+// ── Central revocation ────────────────────────────────────────────────────────
+//
+// A signed deny list (exported/imported via the control plane) marks an agent
+// as revoked. Revocation is enforced in authorizeAction above, before any scope
+// or policy check, so a revoked agent is denied read and write regardless of
+// what its scope would otherwise allow.
+
+export function revokeAgent(agentId: string, reason = ""): void {
+  const db = getDb();
+  db.prepare("INSERT INTO revoked_agents (agent_id, reason) VALUES (?, ?) ON CONFLICT(agent_id) DO UPDATE SET reason = excluded.reason").run(agentId, reason);
+}
+
+export function unrevokeAgent(agentId: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM revoked_agents WHERE agent_id = ?").run(agentId);
+}
+
+export function listRevokedAgents(): { agentId: string; reason: string; revokedAt: string }[] {
+  const db = getDb();
+  return db.prepare("SELECT agent_id AS agentId, reason, revoked_at AS revokedAt FROM revoked_agents ORDER BY revoked_at").all() as { agentId: string; reason: string; revokedAt: string }[];
+}
+
+export function isAgentRevoked(agentId: string): boolean {
+  const db = getDb();
+  return db.prepare("SELECT 1 FROM revoked_agents WHERE agent_id = ?").get(agentId) !== undefined;
 }
 
 // ── Mandatory enforcement flag ───────────────────────────────────────────────

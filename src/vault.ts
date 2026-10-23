@@ -429,6 +429,17 @@ export interface RotationReminder {
   ageDays: number;
 }
 
+export function listSecretInventory(): RotationReminder[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT name, updated_at FROM secrets WHERE name NOT LIKE '@_@_%' ESCAPE '@'").all() as { name: string; updated_at: string }[];
+  const now = Date.now();
+  return rows.map((r) => {
+    const updated = Date.parse(r.updated_at.replace(" ", "T") + "Z");
+    const ageDays = isNaN(updated) ? 0 : Math.floor((now - updated) / (24 * 60 * 60 * 1000));
+    return { name: r.name, updatedAt: r.updated_at, ageDays };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function listRotationNeeded(daysThreshold: number = 90): RotationReminder[] {
   const db = getDb();
   const rows = db.prepare("SELECT name, updated_at FROM secrets WHERE name NOT LIKE '@_@_%' ESCAPE '@'").all() as { name: string; updated_at: string }[];

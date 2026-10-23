@@ -69,7 +69,7 @@ multi-team, multi-thousand-seat environment.
 
 ## Roadmap to enterprise
 
-### Phase 1 — Central control plane
+### Phase 1 — Central control plane ✅ shipped
 
 Give the local model a shared spine without breaking zero-network:
 
@@ -81,6 +81,14 @@ Give the local model a shared spine without breaking zero-network:
 
 **Exit criteria:** a security team can answer "who accessed what, and is anyone
 overdue for rotation" across the org from one place.
+
+Shipped via `keyblind control-plane`. `control-plane export` emits a signed,
+**value-free** bundle (secret names + rotation age, agents, policies, approvals, the
+full ledger and its integrity verdict — no secret values or ciphertext) that can be
+committed to a git repo or object store as the read-only org view. `control-plane init`
+generates the org Ed25519 keypair; member machines `control-plane trust <pubkey>`; and a
+signed deny list of revoked agent IDs is enforced at the same choke point as agent scope
+(read *and* write). The shared store is transport-agnostic — no hosted aggregator yet.
 
 ### Phase 2 — Identity and RBAC
 

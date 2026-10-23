@@ -18,8 +18,9 @@ import { createShareLink, receiveShare } from "./share.js";
 import { setupDeadman, checkin, getDeadmanStatus, disableDeadman, checkDeadmanTrigger } from "./deadman.js";
 import { configureSSO, ssoLogin, ssoLogout, getSSOToken } from "./sso.js";
 import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
-import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies } from "./ledger.js";
+import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies, revokeAgent, unrevokeAgent, listRevokedAgents } from "./ledger.js";
 import { listApprovals, approveApproval, denyApproval, setApprovalRequirement, isApprovalRequired, requireApprovalFor, unrequireApprovalFor } from "./approvals.js";
+import { initControlPlane, exportControlPlane, applyDenyList, trustOrg, untrustOrg, listTrustedOrgs } from "./control-plane.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
@@ -130,6 +131,14 @@ Usage:
   keyblind expiring          List secrets expiring within 30 days
   keyblind sync export       Create encrypted sync bundle
   keyblind sync import <file> Apply a sync bundle from another machine
+  keyblind control-plane init         Generate the org signing keypair
+  keyblind control-plane export       Export a signed, value-free control-plane bundle
+  keyblind control-plane trust <pubkey>  Trust an org public key (honor its deny list)
+  keyblind control-plane untrust <pubkey>  Remove a trusted org public key
+  keyblind control-plane trusted       List trusted org public keys
+  keyblind control-plane apply <file>  Import a signed deny list (revoked agents)
+  keyblind control-plane revoke <agentId> [reason]  Revoke an agent locally
+  keyblind control-plane unrevoke <agentId>        Un-revoke an agent locally
   keyblind migrate <from> <to> Migrate secrets between backends
   keyblind alerts <url>      Configure Slack/Discord webhook alerts
   keyblind totp set <name>   Store a TOTP 2FA config (from otpauth:// URI)
@@ -1548,6 +1557,121 @@ async function main(): Promise<void> {
         } else {
           console.error(`Unknown sync command: ${syncSub}. Use export or import.`);
           process.exit(1);
+        }
+        break;
+      }
+
+      case "control-plane": {
+        const sub = args[1];
+        if (!sub) {
+          console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke>");
+          process.exit(1);
+        }
+        switch (sub) {
+          case "init": {
+            const { publicKey } = initControlPlane();
+            console.log("Org control-plane keypair ready.");
+            console.log(`Public key: ${publicKey}`);
+            console.log("Share this public key with member machines via: keyblind control-plane trust " + publicKey);
+            break;
+          }
+          case "export": {
+            if (!isInitialized()) {
+              console.error("Keyblind not initialized. Run: keyblind init");
+              process.exit(1);
+            }
+            try {
+              const bundle = exportControlPlane();
+              const fileIdx = args.indexOf("--file");
+              if (fileIdx !== -1 && args[fileIdx + 1]) {
+                fs.writeFileSync(args[fileIdx + 1], bundle);
+                console.log(`Control-plane export written to ${args[fileIdx + 1]}`);
+              } else {
+                console.log(bundle);
+              }
+            } catch (err: any) {
+              console.error(err.message);
+              process.exit(1);
+            }
+            break;
+          }
+          case "trust": {
+            const pubkey = args[2];
+            if (!pubkey) {
+              console.error("Usage: keyblind control-plane trust <pubkey>");
+              process.exit(1);
+            }
+            trustOrg(pubkey);
+            console.log(`Trusted org public key: ${pubkey}`);
+            break;
+          }
+          case "untrust": {
+            const pubkey = args[2];
+            if (!pubkey) {
+              console.error("Usage: keyblind control-plane untrust <pubkey>");
+              process.exit(1);
+            }
+            untrustOrg(pubkey);
+            console.log(`Removed trusted org public key: ${pubkey}`);
+            break;
+          }
+          case "trusted": {
+            const keys = listTrustedOrgs();
+            if (keys.length === 0) {
+              console.log("No trusted org public keys.");
+            } else {
+              for (const k of keys) console.log(`  ${k}`);
+            }
+            break;
+          }
+          case "apply": {
+            const file = args[2];
+            if (!file) {
+              console.error("Usage: keyblind control-plane apply <file>");
+              process.exit(1);
+            }
+            try {
+              const result = applyDenyList(fs.readFileSync(file, "utf8"));
+              console.log(`Applied deny list: ${result.revoked} agent(s) revoked.`);
+            } catch (err: any) {
+              console.error(`Apply failed: ${err.message}`);
+              process.exit(1);
+            }
+            break;
+          }
+          case "revoke": {
+            const agentId = args[2];
+            if (!agentId) {
+              console.error("Usage: keyblind control-plane revoke <agentId> [reason]");
+              process.exit(1);
+            }
+            const reason = args.slice(3).join(" ");
+            revokeAgent(agentId, reason);
+            console.log(`Revoked agent ${agentId}${reason ? ` (${reason})` : ""}. Run: keyblind control-plane export`);
+            break;
+          }
+          case "unrevoke": {
+            const agentId = args[2];
+            if (!agentId) {
+              console.error("Usage: keyblind control-plane unrevoke <agentId>");
+              process.exit(1);
+            }
+            unrevokeAgent(agentId);
+            console.log(`Un-revoked agent ${agentId}.`);
+            break;
+          }
+          case "revoked": {
+            const revoked = listRevokedAgents();
+            if (revoked.length === 0) {
+              console.log("No revoked agents.");
+            } else {
+              for (const r of revoked) console.log(`  ${r.agentId}  ${r.reason || ""}  (${r.revokedAt})`);
+            }
+            break;
+          }
+          default:
+            console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke>");
+            process.exit(1);
         }
         break;
       }

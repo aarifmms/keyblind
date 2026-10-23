@@ -18,6 +18,8 @@ import { generateSecret } from "./config.js";
 import { teamInit, teamPush, teamPull, teamList, teamResolve, teamDelete } from "./team.js";
 import { registerAgent, recordAction, verify, listAgents, listEntries, exportCompliance, authorizeAction, isAgentScopeRequired, filterReadableSecrets, listSecretPolicies, setSecretPolicy, clearSecretPolicy } from "./ledger.js";
 import { requestApproval, approvalRequiredFor, listApprovals, approveApproval, denyApproval } from "./approvals.js";
+import { exportControlPlane, trustOrg, listTrustedOrgs } from "./control-plane.js";
+import { revokeAgent, unrevokeAgent } from "./ledger.js";
 import { getVersion } from "./version.js";
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -872,6 +874,60 @@ export async function startHttpServer(port: number = 4318, host: string = "127.0
         }
         return;
       }
+    }
+
+    // ── Control plane REST API ──
+    if (req.url === "/api/control-plane/export" && req.method === "GET") {
+      try {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(exportControlPlane());
+      } catch (err: any) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message || "Export failed" }));
+      }
+      return;
+    }
+
+    if (req.url === "/api/control-plane/trusted" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ publicKeys: listTrustedOrgs() }));
+      return;
+    }
+
+    if (req.url === "/api/control-plane/trust" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const { publicKey } = JSON.parse(body);
+        if (!publicKey) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "publicKey required" })); return; }
+        trustOrg(publicKey);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ trusted: publicKey }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
+      return;
+    }
+
+    if (req.url === "/api/control-plane/revoke" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const { agentId, reason } = JSON.parse(body);
+        if (!agentId) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "agentId required" })); return; }
+        revokeAgent(agentId, reason || "");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ revoked: agentId }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
+      return;
+    }
+
+    if (req.url === "/api/control-plane/unrevoke" && req.method === "POST") {
+      const body = await readBody(req);
+      try {
+        const { agentId } = JSON.parse(body);
+        if (!agentId) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "agentId required" })); return; }
+        unrevokeAgent(agentId);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ unrevoked: agentId }));
+      } catch (err: any) { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: err.message || "Invalid request" })); }
+      return;
     }
 
     // ── TOTP REST API ──

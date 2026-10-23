@@ -172,6 +172,29 @@ Reads (`resolve_secret`, `list_secrets`) are never approval-gated — they remai
 scope-checked only. Approval is human-only by design: an agent cannot approve its own
 action.
 
+## Central Control Plane (org visibility + revocation)
+
+```bash
+keyblind control-plane init               # Generate the org signing keypair (prints public key)
+keyblind control-plane export             # Export a signed, value-free control-plane bundle
+keyblind control-plane trust <pubkey>     # Trust an org public key (honor its deny list)
+keyblind control-plane untrust <pubkey>   # Remove a trusted org public key
+keyblind control-plane trusted            # List trusted org public keys
+keyblind control-plane apply <file>       # Import a signed deny list (revoked agents)
+keyblind control-plane revoke <agentId> [reason]  # Revoke an agent locally (then export)
+keyblind control-plane unrevoke <agentId>        # Un-revoke an agent locally
+```
+
+The export is **value-free** — it carries secret names and rotation age, agent identities
+and scopes, per-secret policies, approvals, and the full agent ledger with its integrity
+verdict, but **no secret values and no ciphertext**. Commit it to a git repo or object
+store to give a security team a single, read-only org-wide view of "who accessed what, and
+is anyone overdue for rotation."
+
+Revocation is enforced at the same choke point as scope: once an agent ID appears in a
+trusted, signed deny list, it is denied read *and* write regardless of its scope. The deny
+list is honored only if its Ed25519 signature verifies against a trusted org public key.
+
 ## Secret Scanning / CI
 
 ```bash
