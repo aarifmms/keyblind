@@ -50,14 +50,17 @@ is the defining enterprise gap and the roadmap below is built around it.
    passphrase; agent identity is a name/email string. Phase 2a adds orgs, roles,
    and group→scope grants, but SSO/OIDC login, SCIM, and short-lived signed
    credentials are still outstanding.
-3. **Rotation is still manual.** `rotate --generate` prints a value you apply by
-   hand; `rotate --exec` is provider-agnostic but you wire the command. True
-   automated rotation (calling provider IAM/service-account APIs) is not done.
-4. **No compliance posture or key escrow.** No SOC 2 / ISO 27001 (partly moot
-   because Keyblind is local, but procurement asks). No org-level key recovery for
-   a departed employee beyond the dead man's switch.
-5. **No enterprise support or SLA.** MIT-licensed and solo-maintained. This alone
-   disqualifies it for many procurement teams regardless of features.
+3. **Rotation is automated, but not yet validated live.** Phase 3 shipped
+   provider-native rotation (AWS IAM / GCP service-account / Azure app-credential)
+   with a rollback window and audit trail. The adapters pass mocked-CLI tests but
+   have not run against real cloud accounts yet.
+4. **Compliance is documented, not certified.** Phase 4 shipped a SOC 2 / ISO 27001
+   narrative (`compliance.md`) and a key-escrow/recovery policy (`key-escrow.md`).
+   There is no formal certification and no N-of-M threshold escrow.
+5. **Enterprise tier is defined, not a change to solo maintenance.** Phase 4 added an
+   `enterprise` license tier and support SLA (`support-sla.md`). Keyblind remains
+   MIT-licensed and solo-maintained — the tier is a contract offer, which still
+   disqualifies it for procurement teams that require a larger vendor.
 
 ## Where it fits today
 
@@ -168,14 +171,15 @@ Two design notes worth flagging:
 **Exit criteria:** a rotated secret is applied to the provider and vault in one
 command, on a schedule, with no human in the loop.
 
-### Phase 4 — Compliance and support
+### Phase 4 — Compliance and support ✅ shipped
 
-- SOC 2 Type II / ISO 27001 narrative for the local architecture.
-- Key escrow / recovery policy for employee departure.
-- Enterprise license tier with a support SLA.
+- SOC 2 Type II / ISO 27001 narrative for the local architecture — `docs/compliance.md`.
+- Key escrow / recovery policy for employee departure — `docs/key-escrow.md`.
+- Enterprise license tier with a support SLA — `enterprise` tier in `src/license.ts` +
+  `docs/support-sla.md`.
 
-**Exit criteria:** the security questionnaire is answered and a support contract
-exists.
+**Exit criteria:** the security questionnaire is answered (`compliance.md`) and a support
+contract exists (`support-sla.md`).
 
 ## Security model in one line
 

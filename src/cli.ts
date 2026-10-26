@@ -11,7 +11,7 @@ import { authenticateWithBiometric, biometricAvailable, createSession, sessionAc
 import { installHook, checkAndReport, getStagedFiles, scanFiles, scanTrackedFiles, scanRepoHistory, setupCi } from "./hook.js";
 import { watchEnvFile } from "./watch.js";
 import { teamInit, teamPush, teamPull, teamList, teamDelete } from "./team.js";
-import { activateLicense, deactivateLicense, getLicenseInfo, isPro, featuresEnabled } from "./license.js";
+import { activateLicense, deactivateLicense, getLicenseInfo, isPro, featuresEnabled, tierLabel } from "./license.js";
 import { readConfig, mergeConfig, generateSecret, parseEnvFile, formatEnvFile } from "./config.js";
 import { runDoctor } from "./doctor.js";
 import { generateBash, generateZsh, generateFish, detectShell, getInstallInstructions } from "./completions.js";
@@ -1278,6 +1278,7 @@ async function main(): Promise<void> {
           console.log(`  CI/CD integration:    ${feats.ciAction ? "✓" : "✗"}`);
           console.log(`  Biometric gate:       ${feats.biometricGate ? "✓" : "✗"}`);
           console.log(`  Cloud backends:       ${feats.cloudBackends ? "✓" : "✗"}`);
+          console.log(`  Priority support (SLA): ${feats.enterprise ? "✓" : "✗"}`);
         }
         if (!result.success) process.exit(1);
         break;
@@ -1304,8 +1305,7 @@ async function main(): Promise<void> {
         console.log("───────────────");
         console.log(`  Secrets:    ${names.length}/${limit}`);
         if (info) {
-          const tierLabel = info.tier === "team" ? "Team" : info.tier === "pro" ? "Pro" : "Free";
-          console.log(`  License:    ${tierLabel}`);
+          console.log(`  License:    ${tierLabel(info.tier)}`);
           console.log(`  Email:      ${info.email}`);
           console.log(`  Expires:    ${info.exp}`);
         } else {

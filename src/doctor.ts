@@ -1,6 +1,6 @@
 import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret, listRotationNeeded, listPendingRevocations, listRevocationsDue } from "./vault.js";
 import { getBackend, listAvailableBackends } from "./backends.js";
-import { getLicenseInfo, getSecretLimit } from "./license.js";
+import { getLicenseInfo, getSecretLimit, tierLabel } from "./license.js";
 import { readConfig } from "./config.js";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
@@ -67,13 +67,12 @@ export function runDoctor(): CheckResult[] {
     if (info) {
       const expDate = new Date(info.exp + "T23:59:59Z");
       const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-      const tierLabel = info.tier === "team" ? "Team" : info.tier === "pro" ? "Pro" : "Free";
       if (info.tier === "free") {
         checks.push({ name: "License", status: "ok", detail: `Free tier (${info.email})` });
       } else if (daysLeft < 30) {
-        checks.push({ name: "License", status: "warn", detail: `${tierLabel} (${info.email}) — expires in ${daysLeft} days` });
+        checks.push({ name: "License", status: "warn", detail: `${tierLabel(info.tier)} (${info.email}) — expires in ${daysLeft} days` });
       } else {
-        checks.push({ name: "License", status: "ok", detail: `${tierLabel} (${info.email}) — expires ${info.exp}` });
+        checks.push({ name: "License", status: "ok", detail: `${tierLabel(info.tier)} (${info.email}) — expires ${info.exp}` });
       }
     } else {
       checks.push({ name: "License", status: "ok", detail: "Free tier (not activated). 5 secret limit." });

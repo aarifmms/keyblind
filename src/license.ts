@@ -37,7 +37,7 @@ function getPublicKeys(): string[] {
 }
 
 export interface LicenseInfo {
-  tier: "free" | "pro" | "team";
+  tier: "free" | "pro" | "team" | "enterprise";
   email: string;
   exp: string; // YYYY-MM-DD
   iat: string; // YYYY-MM-DD
@@ -70,7 +70,7 @@ function parseLicenseKey(key: string): { payload: LicenseInfo; signature: Buffer
     if (!payload.tier || !payload.email || !payload.exp || !payload.iat || !payload.id) {
       return null;
     }
-    if (!["free", "pro", "team"].includes(payload.tier)) {
+    if (!["free", "pro", "team", "enterprise"].includes(payload.tier)) {
       return null;
     }
 
@@ -129,7 +129,7 @@ export function isActivated(): boolean {
 export function isPro(): boolean {
   try {
     const info = getLicenseInfo();
-    return info !== null && (info.tier === "pro" || info.tier === "team");
+    return info !== null && (info.tier === "pro" || info.tier === "team" || info.tier === "enterprise");
   } catch {
     return false;
   }
@@ -138,10 +138,23 @@ export function isPro(): boolean {
 export function isTeam(): boolean {
   try {
     const info = getLicenseInfo();
-    return info !== null && info.tier === "team";
+    return info !== null && (info.tier === "team" || info.tier === "enterprise");
   } catch {
     return false;
   }
+}
+
+export function isEnterprise(): boolean {
+  try {
+    const info = getLicenseInfo();
+    return info !== null && info.tier === "enterprise";
+  } catch {
+    return false;
+  }
+}
+
+export function tierLabel(tier: LicenseInfo["tier"]): string {
+  return tier === "enterprise" ? "Enterprise" : tier === "team" ? "Team" : tier === "pro" ? "Pro" : "Free";
 }
 
 export function getLicenseKey(): string | null {
@@ -214,10 +227,9 @@ export function activateLicense(key: string): { success: boolean; message: strin
 
   fs.writeFileSync(licensePath, JSON.stringify(stored, null, 2), { mode: 0o600 });
 
-  const tierLabel = info.tier === "team" ? "Team" : info.tier === "pro" ? "Pro" : "Free";
   return {
     success: true,
-    message: `Keyblind ${tierLabel} activated for ${info.email}. Expires ${info.exp}.`,
+    message: `Keyblind ${tierLabel(info.tier)} activated for ${info.email}. Expires ${info.exp}.`,
     info,
   };
 }
@@ -260,9 +272,9 @@ export function featuresEnabled(): {
   biometricGate: boolean;
   cloudBackends: boolean;
   unlimitedSecrets: boolean;
+  enterprise: boolean;
 } {
   const pro = isPro();
-  const team = isTeam();
   return {
     teamVaults: pro,
     auditLog: pro,
@@ -271,5 +283,6 @@ export function featuresEnabled(): {
     biometricGate: pro,
     cloudBackends: pro,
     unlimitedSecrets: pro,
+    enterprise: isEnterprise(),
   };
 }
