@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded } from "./vault.js";
+import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded, setRotationConfig, getRotationConfig, listPendingRevocations } from "./vault.js";
+import { rotateProviderSecret, finalizePendingRevocations, type RotationProvider } from "./rotation.js";
+import { awsIamRotationProvider } from "./rotation/aws.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -28,6 +30,10 @@ import crypto from "node:crypto";
 import { spawn, execSync } from "node:child_process";
 import readline from "node:readline";
 import { stdin, stdout } from "node:process";
+
+const ROTATION_PROVIDERS: Record<string, RotationProvider> = {
+  aws: awsIamRotationProvider,
+};
 
 async function readPassphrase(prompt: string): Promise<string> {
   if (!stdin.isTTY) {
@@ -93,6 +99,11 @@ Usage:
   keyblind rotate <name> --generate  Rotate with an auto-generated random value
   keyblind rotate <name> --exec "<cmd>"  Rotate using an external command's stdout
   keyblind rotate --overdue [days]    Rotate all secrets past the threshold
+  keyblind rotate <name> --provider aws --iam-user <user> [--rollback-window N]
+                                  Rotate an AWS IAM access key in AWS and in-vault
+  keyblind rotate --provider aws --overdue [days]  Provider-native rotate overdue AWS secrets
+  keyblind rotate --finalize      Revoke old credentials past their rollback window
+  keyblind rotate --pending       List pending revocations (within rollback window)
   keyblind rotate-needed [days]  List secrets not rotated in N days (default 90)
   keyblind watch [.env]        Watch .env and auto-sandbox on change
   keyblind activate <key>      Activate a Keyblind Pro/Team license
@@ -1041,6 +1052,93 @@ async function main(): Promise<void> {
         if (!isInitialized()) {
           console.error("Keyblind not initialized. Run: keyblind init");
           process.exit(1);
+        }
+
+        // --finalize / --pending operate on the provider-agnostic rotation_pending
+        // table and don't require --provider.
+        if (args.includes("--finalize")) {
+          const { revoked, failed } = await finalizePendingRevocations(ROTATION_PROVIDERS);
+          console.log(`Revocations finalized: ${revoked} revoked, ${failed} failed.`);
+          break;
+        }
+        if (args.includes("--pending")) {
+          const pending = listPendingRevocations();
+          if (pending.length === 0) {
+            console.log("No pending revocations.");
+          } else {
+            console.log("Pending revocations (old credentials awaiting rollback-window expiry):");
+            for (const r of pending) {
+              console.log(`  ${r.secretName.padEnd(24)} ${r.provider.padEnd(8)} ${r.status.padEnd(8)} ${r.oldExternalId}  (revoke at ${r.revokeAt})`);
+            }
+          }
+          break;
+        }
+
+        // Provider-native rotation: rotate the real cloud credential (AWS IAM first),
+        // not just the vault value. Distinct from --generate/--exec value rotation.
+        const providerIdx = args.indexOf("--provider");
+        if (providerIdx !== -1) {
+          const providerName = args[providerIdx + 1];
+          const provider = providerName ? ROTATION_PROVIDERS[providerName] : undefined;
+          if (!provider) {
+            console.error(`Unknown rotation provider: ${providerName ?? "(missing)"}. Available: ${Object.keys(ROTATION_PROVIDERS).join(", ")}`);
+            console.error('Usage: keyblind rotate <name> --provider aws --iam-user <user> [--rollback-window N]');
+            process.exit(1);
+          }
+
+          // Batch: provider-native rotate every overdue secret with a matching config.
+          if (args.includes("--overdue")) {
+            const overdueIdx = args.indexOf("--overdue");
+            const days = parseInt(args[overdueIdx + 1] ?? "90", 10);
+            const threshold = Number.isFinite(days) && days > 0 ? days : 90;
+            const overdue = listRotationNeeded(threshold).filter((s) => getRotationConfig(s.name)?.provider === providerName);
+            if (overdue.length === 0) {
+              console.log(`No overdue secrets with an "${providerName}" rotation config.`);
+              break;
+            }
+            let done = 0;
+            for (const s of overdue) {
+              const cfg = getRotationConfig(s.name)!;
+              await rotateProviderSecret(s.name, provider, cfg.config, cfg.rollbackWindowSeconds);
+              done++;
+            }
+            console.log(`Provider-rotated ${done} overdue secret${done === 1 ? "" : "s"} (${providerName}).`);
+            break;
+          }
+
+          const rotateName = args[1];
+          if (!rotateName) {
+            console.error('Usage: keyblind rotate <name> --provider aws --iam-user <user> [--rollback-window N]');
+            process.exit(1);
+          }
+          if (resolveSecret(rotateName) === null) {
+            console.error(`Secret "${rotateName}" not found.`);
+            process.exit(1);
+          }
+
+          let ctx: Record<string, string>;
+          if (providerName === "aws") {
+            const iamIdx = args.indexOf("--iam-user");
+            const iamUser = iamIdx !== -1 ? args[iamIdx + 1] : undefined;
+            if (!iamUser) {
+              console.error("AWS rotation requires --iam-user <user>.");
+              process.exit(1);
+            }
+            ctx = { iamUserName: iamUser };
+          } else {
+            console.error(`No context builder for rotation provider "${providerName}".`);
+            process.exit(1);
+          }
+
+          const winIdx = args.indexOf("--rollback-window");
+          const window = winIdx !== -1 ? parseInt(args[winIdx + 1], 10) || 300 : 300;
+
+          setRotationConfig(rotateName, providerName, ctx, window);
+          const result = await rotateProviderSecret(rotateName, provider, ctx, window);
+          console.log(`Rotated "${rotateName}" (${providerName}): ${result.oldExternalId} → ${result.externalId}`);
+          console.log(`Old credential ${result.oldExternalId} will be revoked after ${result.windowSeconds}s (revoke at ${result.revokeAt}).`);
+          console.log(`Finalize with: keyblind rotate --finalize`);
+          break;
         }
 
         const execIdx = args.indexOf("--exec");

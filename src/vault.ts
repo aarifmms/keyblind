@@ -276,6 +276,28 @@ export function getDb(): Database.Database {
   _db.exec(`
     CREATE INDEX IF NOT EXISTS idx_secret_history_name ON secret_history(name);
   `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS rotation_pending (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      secret_name TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      old_external_id TEXT NOT NULL,
+      revoke_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','revoked','failed')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  _db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_rotation_pending_status ON rotation_pending(status);
+  `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS rotation_config (
+      secret_name TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      config TEXT NOT NULL,
+      rollback_window_seconds INTEGER NOT NULL DEFAULT 300
+    )
+  `);
   for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
     try {
       if (fs.existsSync(f)) fs.chmodSync(f, 0o600);
@@ -454,6 +476,113 @@ export function listRotationNeeded(daysThreshold: number = 90): RotationReminder
     }
   }
   return reminders.sort((a, b) => b.ageDays - a.ageDays);
+}
+
+// --- Automated Rotation (provider-native) ---
+
+export type RevocationStatus = "pending" | "revoked" | "failed";
+
+export interface PendingRevocation {
+  id: number;
+  secretName: string;
+  provider: string;
+  oldExternalId: string;
+  revokeAt: string;
+  status: RevocationStatus;
+  createdAt: string;
+}
+
+interface RevocationRow {
+  id: number;
+  secret_name: string;
+  provider: string;
+  old_external_id: string;
+  revoke_at: string;
+  status: RevocationStatus;
+  created_at: string;
+}
+
+function mapRevocationRow(r: RevocationRow): PendingRevocation {
+  return {
+    id: r.id,
+    secretName: r.secret_name,
+    provider: r.provider,
+    oldExternalId: r.old_external_id,
+    revokeAt: r.revoke_at,
+    status: r.status,
+    createdAt: r.created_at,
+  };
+}
+
+export function scheduleRevocation(secretName: string, provider: string, oldExternalId: string, windowSeconds: number): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO rotation_pending (secret_name, provider, old_external_id, revoke_at) VALUES (?, ?, ?, datetime('now', ?))",
+  ).run(secretName, provider, oldExternalId, `+${windowSeconds} seconds`);
+}
+
+export function listPendingRevocations(): PendingRevocation[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM rotation_pending ORDER BY id").all() as RevocationRow[];
+  return rows.map(mapRevocationRow);
+}
+
+export function listRevocationsDue(): PendingRevocation[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM rotation_pending WHERE status = 'pending' AND revoke_at <= datetime('now') ORDER BY id",
+  ).all() as RevocationRow[];
+  return rows.map(mapRevocationRow);
+}
+
+export function markRevocationStatus(id: number, status: RevocationStatus): void {
+  const db = getDb();
+  db.prepare("UPDATE rotation_pending SET status = ? WHERE id = ?").run(status, id);
+}
+
+export interface RotationConfig {
+  secretName: string;
+  provider: string;
+  config: Record<string, string>;
+  rollbackWindowSeconds: number;
+}
+
+export function setRotationConfig(secretName: string, provider: string, config: Record<string, string>, rollbackWindowSeconds: number = 300): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO rotation_config (secret_name, provider, config, rollback_window_seconds)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(secret_name) DO UPDATE SET
+       provider = excluded.provider,
+       config = excluded.config,
+       rollback_window_seconds = excluded.rollback_window_seconds`,
+  ).run(secretName, provider, JSON.stringify(config), rollbackWindowSeconds);
+}
+
+export function getRotationConfig(secretName: string): RotationConfig | null {
+  const db = getDb();
+  const row = db.prepare("SELECT * FROM rotation_config WHERE secret_name = ?").get(secretName) as
+    | { secret_name: string; provider: string; config: string; rollback_window_seconds: number }
+    | undefined;
+  if (!row) return null;
+  return {
+    secretName: row.secret_name,
+    provider: row.provider,
+    config: JSON.parse(row.config) as Record<string, string>,
+    rollbackWindowSeconds: row.rollback_window_seconds,
+  };
+}
+
+export function listRotationConfigs(): RotationConfig[] {
+  const db = getDb();
+  const rows = db.prepare("SELECT * FROM rotation_config ORDER BY secret_name").all() as
+    { secret_name: string; provider: string; config: string; rollback_window_seconds: number }[];
+  return rows.map((r) => ({
+    secretName: r.secret_name,
+    provider: r.provider,
+    config: JSON.parse(r.config) as Record<string, string>,
+    rollbackWindowSeconds: r.rollback_window_seconds,
+  }));
 }
 
 export function closeDb(): void {

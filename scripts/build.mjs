@@ -7,6 +7,7 @@
 // separately by tsc (see package.json "build").
 import { build } from "esbuild";
 import { readdirSync, rmSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
 // Remove stale sourcemaps from prior builds. We ship without maps so the
 // published tarball contains no embedded original source.
@@ -16,9 +17,19 @@ if (existsSync("dist")) {
   }
 }
 
-const entries = readdirSync("src")
-  .filter((f) => f.endsWith(".ts"))
-  .map((f) => `src/${f}`);
+// Collect every .ts entry recursively so subdirectories (e.g. src/rotation/)
+// are compiled too.
+function collectTs(dir) {
+  const out = [];
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, ent.name);
+    if (ent.isDirectory()) out.push(...collectTs(full));
+    else if (ent.name.endsWith(".ts")) out.push(full);
+  }
+  return out;
+}
+
+const entries = collectTs("src");
 
 await build({
   entryPoints: entries,
