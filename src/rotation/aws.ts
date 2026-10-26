@@ -10,6 +10,10 @@ function runAws(args: string[], env?: Record<string, string>): string {
   return result.trim();
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function splitValue(value: string): { id: string; secret: string } {
   const idx = value.indexOf(":");
   if (idx === -1) return { id: value, secret: "" };
@@ -38,17 +42,24 @@ export const awsIamRotationProvider: RotationProvider = {
   async verify(ctx: RotationContext, value: string) {
     const { id, secret } = splitValue(value);
     if (!id || !secret) return false;
-    try {
-      runAws(["sts", "get-caller-identity", "--output", "json"], {
-        AWS_ACCESS_KEY_ID: id,
-        AWS_SECRET_ACCESS_KEY: secret,
-        AWS_PROFILE: "",
-        AWS_DEFAULT_PROFILE: "",
-        AWS_EC2_METADATA_DISABLED: "true",
-      });
-      return true;
-    } catch {
-      return false;
+    // IAM is eventually consistent: a freshly created access key can return
+    // InvalidClientTokenId for several seconds before it is usable. Retry with
+    // backoff until it propagates (or the window expires).
+    const deadline = Date.now() + 30_000;
+    let delay = 1000;
+    for (;;) {
+      try {
+        runAws(["sts", "get-caller-identity", "--output", "json"], {
+          AWS_ACCESS_KEY_ID: id,
+          AWS_SECRET_ACCESS_KEY: secret,
+          AWS_EC2_METADATA_DISABLED: "true",
+        });
+        return true;
+      } catch {
+        if (Date.now() >= deadline) return false;
+        await sleep(delay);
+        delay = Math.min(delay * 2, 8000);
+      }
     }
   },
 

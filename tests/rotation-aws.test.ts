@@ -48,11 +48,18 @@ describe("awsIamRotationProvider", () => {
     expect(call[2].env.AWS_SECRET_ACCESS_KEY).toBe("SECRETTEST");
   });
 
-  it("returns false when sts fails", async () => {
-    mocks.execFileSync.mockImplementation(() => {
-      throw new Error("InvalidClientTokenId");
-    });
-    expect(await awsIamRotationProvider.verify({ iamUserName: "svc" }, "AKIATEST:SECRETTEST")).toBe(false);
+  it("returns false when sts fails after the retry window", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.execFileSync.mockImplementation(() => {
+        throw new Error("InvalidClientTokenId");
+      });
+      const result = awsIamRotationProvider.verify({ iamUserName: "svc" }, "AKIATEST:SECRETTEST");
+      await vi.runAllTimersAsync();
+      expect(await result).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns false for a malformed value", async () => {
