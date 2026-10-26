@@ -4,6 +4,24 @@ All notable changes to Keyblind are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-10-25
+
+### Added
+
+- **Bounded-staleness revocation.** Remote revocation and group-scope changes now
+  reach local vaults within a configurable window instead of waiting for a manual
+  `control-plane sync`. The enforcement path re-pulls the signed manifest on access
+  when the last sync is older than the staleness window (default 60s), using a
+  conditional `If-None-Match`/`ETag` request so an unchanged manifest is a cheap
+  304. Fail-open by default; `control-plane fail-closed on` denies access when a
+  re-sync fails.
+  - `control-plane staleness [secs]` — get/set the window (`-1` = manual-only,
+    `0` = re-sync every access).
+  - `control-plane fail-closed on|off` — invert the failure posture.
+  - `control-plane sync --watch [--interval secs]` — foreground poller.
+  - `control-plane status` reports the policy; the `revoked` subcommand is now
+    documented.
+
 ## [0.9.2] - 2026-10-25
 
 ### Added
@@ -142,6 +160,7 @@ First tagged stable release with the full feature set: local encrypted vault, MC
 team vaults, CLI pairing, web dashboard, Chrome extension, sandboxing, TOTP, secret sharing,
 dead man's switch, SSO, and the Know Your Agent ledger.
 
+[0.9.3]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.3
 [0.9.2]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.2
 [0.9.1]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.1
 [0.9.0]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.0
