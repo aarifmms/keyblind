@@ -1,7 +1,7 @@
 # Compliance — SOC 2 / ISO 27001 narrative
 
 > A procurement-ready explanation of how Keyblind maps to SOC 2 and ISO 27001,
-> written for the security team reviewing the vendor questionnaire. Updated for v0.9.1.
+> written for the security team reviewing the vendor questionnaire. Updated for v0.9.2.
 
 ## Positioning
 

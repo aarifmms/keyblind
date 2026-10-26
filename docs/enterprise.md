@@ -1,7 +1,7 @@
 # Enterprise Readiness
 
 An honest assessment of where Keyblind stands for enterprise adoption, what's
-still missing, and the roadmap to close the gap. Updated for v0.9.1.
+still missing, and the roadmap to close the gap. Updated for v0.9.2.
 
 ## Positioning
 
