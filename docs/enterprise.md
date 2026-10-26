@@ -46,10 +46,10 @@ is the defining enterprise gap and the roadmap below is built around it.
    Phase 2a is landing a hosted control plane (Turso-backed, signed manifest) that
    removes the manual export/apply step; revocation is eventually-consistent via
    `control-plane sync` rather than real-time.
-2. **No real RBAC or directory integration.** Team vaults are gated by a shared
-   passphrase; agent identity is a name/email string. Phase 2a adds orgs, roles,
-   and group→scope grants, but SSO/OIDC login, SCIM, and short-lived signed
-   credentials are still outstanding.
+2. **No SCIM / directory auto-provisioning.** Orgs, roles, and group→scope grants
+   (Phase 2a), SSO/OIDC login (Phase 2b), and short-lived signed agent
+   credentials (Phase 2b) are all shipped. SCIM auto-provisioning is the one
+   directory-integration piece still open.
 3. **Rotation is automated and validated live.** Phase 3 shipped provider-native
    rotation (AWS IAM / GCP service-account / Azure app-credential) with a rollback
    window and audit trail. All three adapters have been run against real cloud
@@ -183,6 +183,27 @@ command, on a schedule, with no human in the loop.
 
 **Exit criteria:** the security questionnaire is answered (`compliance.md`) and a support
 contract exists (`support-sla.md`).
+
+## Remaining gaps (uncommitted — not on the numbered roadmap)
+
+Phases 1–4 are complete. These are the items that remain and are not yet scoped
+to a phase; they are the single canonical list of what a procurement team should
+treat as open.
+
+1. **Formal SOC 2 Type II / ISO 27001 certification** — `compliance.md` is a
+   narrative, not an attestation. Teams that hard-require a report still need a
+   third-party assessor engagement (see `support-sla.md`).
+2. **N-of-M threshold escrow** — the dead man's switch is single-contact,
+   all-or-nothing. A Shamir-style threshold scheme (e.g. 3-of-5 among
+   executives) is a candidate follow-on (`key-escrow.md`).
+3. **SCIM / directory auto-provisioning** — SSO login is shipped, but automated
+   directory-driven user provisioning is not.
+4. **24/7 SOC / managed detection** — irrelevant to the local tool; relevant only
+   if the hosted control plane is adopted (which stores no secret values).
+5. **Solo-maintainer supply chain** — signed provenance mitigates tampering, but
+   the bus factor remains.
+6. **Real-time revocation** — the deny list and group scopes propagate on the
+   next `control-plane sync`, not instantly.
 
 ## Security model in one line
 
