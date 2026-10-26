@@ -1,7 +1,7 @@
 # Enterprise Readiness
 
 An honest assessment of where Keyblind stands for enterprise adoption, what's
-still missing, and the roadmap to close the gap. Updated for v0.9.2.
+still missing, and the roadmap to close the gap. Updated for v0.9.3.
 
 ## Positioning
 
@@ -44,8 +44,8 @@ is the defining enterprise gap and the roadmap below is built around it.
    *synchronized* spine: a signed, value-free export for org-wide visibility and a
    signed deny list for central revocation, shared via a git repo or object store.
    Phase 2a is landing a hosted control plane (Turso-backed, signed manifest) that
-   removes the manual export/apply step; revocation is eventually-consistent via
-   `control-plane sync` rather than real-time.
+   removes the manual export/apply step; revocation is bounded-staleness (an
+   on-access re-sync, default 60s) rather than manual-only `control-plane sync`.
 2. **No SCIM / directory auto-provisioning.** Orgs, roles, and group→scope grants
    (Phase 2a), SSO/OIDC login (Phase 2b), and short-lived signed agent
    credentials (Phase 2b) are all shipped. SCIM auto-provisioning is the one
@@ -202,8 +202,11 @@ treat as open.
    if the hosted control plane is adopted (which stores no secret values).
 5. **Solo-maintainer supply chain** — signed provenance mitigates tampering, but
    the bus factor remains.
-6. **Real-time revocation** — the deny list and group scopes propagate on the
-   next `control-plane sync`, not instantly.
+6. **True instant (push) revocation** — the deny list and group scopes now
+   propagate within a bounded staleness window (default 60s, tunable via
+   `control-plane staleness`, `fail-closed` available), not instantly: the local
+   vault polls, it is not pushed. Instant push needs a relay, which conflicts
+   with the zero-network model.
 
 ## Security model in one line
 

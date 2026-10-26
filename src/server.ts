@@ -20,6 +20,7 @@ import { registerAgent, recordAction, verify, listAgents, listEntries, exportCom
 import { authorizeToken, filterReadableByToken } from "./agent-token.js";
 import { requestApproval, approvalRequiredFor, listApprovals, approveApproval, denyApproval } from "./approvals.js";
 import { exportControlPlane, trustOrg, listTrustedOrgs } from "./control-plane.js";
+import { ensureFreshRevocation } from "./org-sync.js";
 import { revokeAgent, unrevokeAgent } from "./ledger.js";
 import { getVersion } from "./version.js";
 
@@ -37,7 +38,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 // direct CLI / human use) unless mandatory enforcement is enabled, in which case
 // anonymous access is refused. Supplying agentId opts into signed scope checks;
 // a token opts into the org-issued short-lived-credential path instead.
-function checkAgentAccess(
+async function checkAgentAccess(
   agentId: string | undefined,
   signature: string | undefined,
   action: "read" | "write",
@@ -45,7 +46,14 @@ function checkAgentAccess(
   nonce?: string,
   exp?: number,
   token?: string,
-): string | null {
+): Promise<string | null> {
+  if (token || agentId) {
+    try {
+      await ensureFreshRevocation();
+    } catch (err) {
+      return `Control-plane sync failed (fail-closed): ${(err as Error).message}`;
+    }
+  }
   if (token) {
     return authorizeToken(token, action, target);
   }
@@ -162,7 +170,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "read", name, nonce, exp, token);
+      const deny = await checkAgentAccess(agentId, signature, "read", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
@@ -203,7 +211,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
+      const deny = await checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
@@ -256,7 +264,7 @@ export function createServer(): McpServer {
         return { content: [{ type: "text", text: JSON.stringify({ secrets }) }] };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "read", "*", nonce, exp);
+      const deny = await checkAgentAccess(agentId, signature, "read", "*", nonce, exp);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }
@@ -355,7 +363,7 @@ export function createServer(): McpServer {
         };
       }
 
-      const deny = checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
+      const deny = await checkAgentAccess(agentId, signature, "write", name, nonce, exp, token);
       if (deny) {
         return { content: [{ type: "text", text: JSON.stringify({ error: `Access denied: ${deny}` }) }], isError: true };
       }

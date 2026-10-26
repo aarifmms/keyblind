@@ -25,7 +25,7 @@ import { setupAll, setupLocal, type SetupResult } from "./setup-mcp.js";
 import { registerAgent, verify as verifyLedger, listAgents, exportCompliance, isAgentScopeRequired, setAgentScopeRequirement, setSecretPolicy, clearSecretPolicy, listSecretPolicies, revokeAgent, unrevokeAgent, listRevokedAgents, signRequest } from "./ledger.js";
 import { listApprovals, approveApproval, denyApproval, setApprovalRequirement, isApprovalRequired, requireApprovalFor, unrequireApprovalFor } from "./approvals.js";
 import { initControlPlane, exportControlPlane, applyDenyList, trustOrg, untrustOrg, listTrustedOrgs } from "./control-plane.js";
-import { connectOrg, disconnectOrg, getOrgConnection, syncOrg } from "./org-sync.js";
+import { connectOrg, disconnectOrg, getOrgConnection, syncOrg, getRevocationPolicy, setRevocationStaleness, setRevocationFailClosed } from "./org-sync.js";
 import { createCiBundle, parseCiBundle, renderEnvFile, setupCiInjection } from "./ci.js";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -1716,7 +1716,7 @@ async function main(): Promise<void> {
       case "control-plane": {
         const sub = args[1];
         if (!sub) {
-          console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|connect|sync|disconnect|status>");
+          console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|revoked|connect|sync|staleness|fail-closed|disconnect|status>");
           process.exit(1);
         }
         switch (sub) {
@@ -1838,11 +1838,61 @@ async function main(): Promise<void> {
             break;
           }
           case "sync": {
-            try {
-              const result = await syncOrg();
-              console.log(`Synced: ${result.revoked} revoked, ${result.grants} group grant(s) applied.`);
-            } catch (err: any) {
-              console.error(`Sync failed: ${err.message}`);
+            const watch = args.includes("--watch");
+            const intervalIdx = args.indexOf("--interval");
+            const intervalMs = intervalIdx !== -1 && args[intervalIdx + 1] ? Number(args[intervalIdx + 1]) * 1000 : 60_000;
+            const syncOnce = async () => {
+              try {
+                const result = await syncOrg();
+                if (result.changed) {
+                  console.log(`Synced: ${result.revoked} revoked, ${result.grants} group grant(s) applied.`);
+                } else {
+                  console.log("Already up to date.");
+                }
+              } catch (err: any) {
+                console.error(`Sync failed: ${err.message}`);
+                if (!watch) process.exit(1);
+              }
+            };
+            if (!watch) {
+              await syncOnce();
+            } else {
+              console.log(`Watching for manifest changes every ${intervalMs / 1000}s (Ctrl+C to stop).`);
+              // eslint-disable-next-line no-constant-condition
+              while (true) {
+                await syncOnce();
+                await new Promise((r) => setTimeout(r, intervalMs));
+              }
+            }
+            break;
+          }
+          case "staleness": {
+            const val = args[2];
+            if (val === undefined) {
+              const p = getRevocationPolicy();
+              console.log(`Max staleness: ${p.maxStalenessSeconds < 0 ? "manual-only (-1)" : `${p.maxStalenessSeconds}s`}`);
+              console.log(`Fail-closed: ${p.failClosed ? "on" : "off"}`);
+            } else {
+              const secs = Number(val);
+              if (!Number.isInteger(secs) || secs < -1) {
+                console.error("Usage: keyblind control-plane staleness [secs]  (integer >= -1; -1 = manual-only, 0 = re-sync every access)");
+                process.exit(1);
+              }
+              setRevocationStaleness(secs);
+              console.log(`Max staleness set to ${secs}s.`);
+            }
+            break;
+          }
+          case "fail-closed": {
+            const val = args[2];
+            if (val === "on") {
+              setRevocationFailClosed(true);
+              console.log("Fail-closed enabled: a failed re-sync denies agent access.");
+            } else if (val === "off") {
+              setRevocationFailClosed(false);
+              console.log("Fail-closed disabled: a failed re-sync proceeds on last-known state.");
+            } else {
+              console.error("Usage: keyblind control-plane fail-closed <on|off>");
               process.exit(1);
             }
             break;
@@ -1860,11 +1910,13 @@ async function main(): Promise<void> {
               console.log(`Connected: ${conn.url}`);
               console.log(`Org ID: ${conn.orgId}`);
               console.log(`Org public key: ${conn.orgPublicKey}`);
+              const p = getRevocationPolicy();
+              console.log(`Revocation staleness: ${p.maxStalenessSeconds < 0 ? "manual-only" : `${p.maxStalenessSeconds}s`}${p.failClosed ? " (fail-closed)" : ""}`);
             }
             break;
           }
           default:
-            console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|connect|sync|disconnect|status>");
+            console.error("Usage: keyblind control-plane <init|export|trust|untrust|trusted|apply|revoke|unrevoke|revoked|connect|sync|staleness|fail-closed|disconnect|status>");
             process.exit(1);
         }
         break;

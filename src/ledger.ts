@@ -157,6 +157,13 @@ function getDb(): Database.Database {
       PRIMARY KEY(agent_id, nonce)
     )
   `);
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS org_sync_state (
+      org_id TEXT PRIMARY KEY,
+      last_synced_at INTEGER NOT NULL,
+      version TEXT NOT NULL DEFAULT ''
+    )
+  `);
   return _db;
 }
 
@@ -438,6 +445,33 @@ export function replaceOrgGrants(orgId: string, grants: { agentId: string; scope
 export function listGroupGrants(): { orgId: string; agentId: string; scope: string; syncedAt: string }[] {
   const db = getDb();
   return db.prepare("SELECT org_id AS orgId, agent_id AS agentId, scope, synced_at AS syncedAt FROM group_grants ORDER BY org_id, agent_id").all() as { orgId: string; agentId: string; scope: string; syncedAt: string }[];
+}
+
+// ── Org sync state ────────────────────────────────────────────────────────────
+//
+// Tracks the last successful control-plane sync per org: the monotonic
+// last-synced timestamp and the manifest version (ETag) seen, so the enforcement
+// path can decide whether a re-sync is due and make conditional 304 requests.
+
+export interface OrgSyncState {
+  lastSyncedAt: number | null;
+  version: string;
+}
+
+export function getOrgSyncState(orgId: string): OrgSyncState {
+  const db = getDb();
+  const row = db.prepare("SELECT last_synced_at AS lastSyncedAt, version FROM org_sync_state WHERE org_id = ?").get(orgId) as
+    | { lastSyncedAt: number; version: string }
+    | undefined;
+  if (!row) return { lastSyncedAt: null, version: "" };
+  return { lastSyncedAt: row.lastSyncedAt, version: row.version };
+}
+
+export function setOrgSyncState(orgId: string, version: string): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO org_sync_state (org_id, last_synced_at, version) VALUES (?, ?, ?) ON CONFLICT(org_id) DO UPDATE SET last_synced_at = excluded.last_synced_at, version = excluded.version",
+  ).run(orgId, Date.now(), version);
 }
 
 // ── Mandatory enforcement flag ───────────────────────────────────────────────

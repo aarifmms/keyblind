@@ -20,6 +20,21 @@ function signEd25519(payload: string, privateKeyB64: string): string {
   return crypto.sign(null, Buffer.from(payload, "utf8"), priv).toString("base64");
 }
 
+// A stable version over the revocation-relevant manifest parts (deny list, group
+// scopes, and groups). The underlying queries return unordered rows and the
+// signed doc includes a per-request `exportedAt`, so the version is derived from
+// a key-sorted projection rather than the raw response. Local vaults send this
+// back as `If-None-Match` to make polling a cheap 304.
+export function computeManifestVersion(denyList: unknown, groups: unknown, agentScopes: unknown): string {
+  const byAgentId = (a: { agentId: string }, b: { agentId: string }): number => String(a.agentId).localeCompare(String(b.agentId));
+  const normalized = {
+    denyList: [...(denyList as { agentId: string }[])].sort(byAgentId),
+    groups: [...(groups as { id: string }[])].sort((a, b) => String(a.id).localeCompare(String(b.id))),
+    agentScopes: [...(agentScopes as { agentId: string }[])].sort(byAgentId),
+  };
+  return crypto.createHash("sha256").update(canonicalize(normalized)).digest("base64url");
+}
+
 // Builds the signed, value-free org manifest: deny list + group-derived agent
 // scopes. No secret values or ciphertext. Local vaults verify the signature
 // against the org public key (trusted out-of-band) and apply the contents.

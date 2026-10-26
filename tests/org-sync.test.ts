@@ -19,9 +19,13 @@ vi.mock("node:os", async (importOriginal) => {
 import {
   setLedgerPath, closeLedger, registerAgent, signRequest, authorizeAction, filterReadableSecrets,
   replaceOrgGrants, replaceOrgRevocations, getGroupScopes, listGroupGrants, isAgentRevoked, revokeAgent,
+  getLedgerDb, setOrgSyncState,
 } from "../src/ledger.js";
 import { trustOrg, listTrustedOrgs, canonicalize } from "../src/control-plane.js";
-import { connectOrg, syncOrg, disconnectOrg, getOrgConnection } from "../src/org-sync.js";
+import {
+  connectOrg, syncOrg, disconnectOrg, getOrgConnection, ensureFreshRevocation,
+  getRevocationPolicy, setRevocationStaleness, setRevocationFailClosed,
+} from "../src/org-sync.js";
 
 function generateKeypair(): { publicKey: string; privateKey: string } {
   const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
@@ -196,7 +200,7 @@ describe("syncOrg", () => {
     stubFetch(manifest);
 
     const result = await syncOrg();
-    expect(result).toEqual({ revoked: 1, grants: 1 });
+    expect(result).toEqual({ changed: true, version: "", revoked: 1, grants: 1 });
     expect(isAgentRevoked(revokedAgent.identity.id)).toBe(true);
     expect(getGroupScopes(agent.identity.id)).toEqual(["read:prod-*"]);
   });
@@ -230,5 +234,103 @@ describe("syncOrg", () => {
 
   it("throws when not connected", async () => {
     await expect(syncOrg()).rejects.toThrow(/not connected to an org/i);
+  });
+});
+
+describe("bounded-staleness revocation", () => {
+  function connect(kp: { publicKey: string }) {
+    trustOrg(kp.publicKey);
+    fs.writeFileSync(
+      path.join(state.tmpDir, "connection.json"),
+      JSON.stringify({ url: "https://cp.example/api/org/acme", orgId: "org-1", orgPublicKey: kp.publicKey }),
+    );
+  }
+
+  function backdateSync(seconds: number) {
+    getLedgerDb().prepare("UPDATE org_sync_state SET last_synced_at = ? WHERE org_id = ?").run(Date.now() - seconds * 1000, "org-1");
+  }
+
+  it("syncOrg sends If-None-Match on repeat and short-circuits on 304", async () => {
+    const kp = generateKeypair();
+    connect(kp);
+    let sawInm = false;
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
+      calls++;
+      if (init?.headers?.["If-None-Match"]) sawInm = true;
+      if (init?.headers?.["If-None-Match"]) {
+        return new Response(null, { status: 304, headers: { ETag: "v1" } });
+      }
+      return new Response(makeManifest(kp), { status: 200, headers: { ETag: "v1" } });
+    }));
+
+    const first = await syncOrg();
+    expect(first).toEqual({ changed: true, version: "v1", revoked: 0, grants: 0 });
+    const second = await syncOrg();
+    expect(second).toEqual({ changed: false, version: "v1", revoked: 0, grants: 0 });
+    expect(sawInm).toBe(true);
+    expect(calls).toBe(2);
+  });
+
+  it("ensureFreshRevocation skips when fresh and re-syncs when stale", async () => {
+    const kp = generateKeypair();
+    connect(kp);
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls++;
+      return new Response(makeManifest(kp), { status: 200, headers: { ETag: "v1" } });
+    }));
+
+    setOrgSyncState("org-1", "v1"); // just synced → fresh
+    await ensureFreshRevocation();
+    expect(calls).toBe(0);
+
+    backdateSync(120); // 120s stale → over the 60s default window
+    await ensureFreshRevocation();
+    expect(calls).toBe(1);
+  });
+
+  it("dedupes concurrent re-syncs into a single fetch", async () => {
+    const kp = generateKeypair();
+    connect(kp);
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 10));
+      return new Response(makeManifest(kp), { status: 200, headers: { ETag: "v1" } });
+    }));
+    backdateSync(120);
+    await Promise.all([ensureFreshRevocation(), ensureFreshRevocation(), ensureFreshRevocation()]);
+    expect(calls).toBe(1);
+  });
+
+  it("fails open by default (proceeds on fetch error)", async () => {
+    const kp = generateKeypair();
+    connect(kp);
+    backdateSync(120);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
+    await expect(ensureFreshRevocation()).resolves.toBeUndefined();
+  });
+
+  it("fails closed when configured", async () => {
+    const kp = generateKeypair();
+    connect(kp);
+    setRevocationFailClosed(true);
+    backdateSync(120);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
+    await expect(ensureFreshRevocation()).rejects.toThrow(/network down/i);
+  });
+
+  it("reads and writes the revocation policy", () => {
+    const kp = generateKeypair();
+    connect(kp);
+    expect(getRevocationPolicy()).toEqual({ maxStalenessSeconds: 60, failClosed: false });
+
+    setRevocationStaleness(0);
+    expect(getRevocationPolicy().maxStalenessSeconds).toBe(0);
+    setRevocationStaleness(-1);
+    expect(getRevocationPolicy().maxStalenessSeconds).toBe(-1);
+    setRevocationFailClosed(true);
+    expect(getRevocationPolicy().failClosed).toBe(true);
   });
 });
