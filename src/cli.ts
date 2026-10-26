@@ -2,6 +2,8 @@
 import { initializeVault, getKey, storeSecret, listSecrets, resolveSecret, deleteSecret, isInitialized, closeDb, clearKey, rotateMasterKey, setRequireSession, setSessionRequirement, isSessionRequired, setProjectName, getProjectName, getAuditLog, checkExpired, setExpiry, setClientInfo, listRotationNeeded, setRotationConfig, getRotationConfig, listPendingRevocations } from "./vault.js";
 import { rotateProviderSecret, finalizePendingRevocations, type RotationProvider } from "./rotation.js";
 import { awsIamRotationProvider } from "./rotation/aws.js";
+import { gcpServiceAccountRotationProvider } from "./rotation/gcp.js";
+import { azureAppCredentialRotationProvider } from "./rotation/azure.js";
 import { startServer, startHttpServer } from "./server.js";
 import { sandboxEnvFile, unsandboxEnvFile } from "./sandbox.js";
 import { setBackend, getBackend, listAvailableBackends } from "./backends.js";
@@ -33,6 +35,8 @@ import { stdin, stdout } from "node:process";
 
 const ROTATION_PROVIDERS: Record<string, RotationProvider> = {
   aws: awsIamRotationProvider,
+  gcp: gcpServiceAccountRotationProvider,
+  azure: azureAppCredentialRotationProvider,
 };
 
 async function readPassphrase(prompt: string): Promise<string> {
@@ -101,7 +105,11 @@ Usage:
   keyblind rotate --overdue [days]    Rotate all secrets past the threshold
   keyblind rotate <name> --provider aws --iam-user <user> [--rollback-window N]
                                   Rotate an AWS IAM access key in AWS and in-vault
-  keyblind rotate --provider aws --overdue [days]  Provider-native rotate overdue AWS secrets
+  keyblind rotate <name> --provider gcp --service-account <email> [--rollback-window N]
+                                  Rotate a GCP service-account key in GCP and in-vault
+  keyblind rotate <name> --provider azure --app-id <id> [--tenant <id>] [--rollback-window N]
+                                  Rotate an Azure app client secret in Azure and in-vault
+  keyblind rotate --provider <aws|gcp|azure> --overdue [days]  Provider-native rotate overdue secrets
   keyblind rotate --finalize      Revoke old credentials past their rollback window
   keyblind rotate --pending       List pending revocations (within rollback window)
   keyblind rotate-needed [days]  List secrets not rotated in N days (default 90)
@@ -1125,6 +1133,24 @@ async function main(): Promise<void> {
               process.exit(1);
             }
             ctx = { iamUserName: iamUser };
+          } else if (providerName === "gcp") {
+            const saIdx = args.indexOf("--service-account");
+            const saEmail = saIdx !== -1 ? args[saIdx + 1] : undefined;
+            if (!saEmail) {
+              console.error("GCP rotation requires --service-account <email>.");
+              process.exit(1);
+            }
+            ctx = { serviceAccountEmail: saEmail };
+          } else if (providerName === "azure") {
+            const appIdx = args.indexOf("--app-id");
+            const appId = appIdx !== -1 ? args[appIdx + 1] : undefined;
+            if (!appId) {
+              console.error("Azure rotation requires --app-id <app-id>.");
+              process.exit(1);
+            }
+            ctx = { appId };
+            const tenantIdx = args.indexOf("--tenant");
+            if (tenantIdx !== -1 && args[tenantIdx + 1]) ctx.tenant = args[tenantIdx + 1];
           } else {
             console.error(`No context builder for rotation provider "${providerName}".`);
             process.exit(1);

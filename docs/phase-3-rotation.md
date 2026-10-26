@@ -1,7 +1,7 @@
 # Phase 3 — Automated rotation (provider-native)
 
-> Status: Parts 1–3 ✅ shipped · Parts 4–5 deferred
-> Created: 2026-10-25 · Part 1–3 complete 2026-10-25
+> Status: Phase 3 complete ✅ (Parts 1–5)
+> Created: 2026-10-25 · All parts complete 2026-10-25
 
 ## Context
 
@@ -83,9 +83,56 @@ table). Single-secret rotation sets the `rotation_config` *before* rotating so a
 always has a config to finalize against. `scripts/build.mjs` now globs `src/**/*.ts` recursively so
 `src/rotation/aws.ts` ships in `dist/`.
 
-## Part 4 (deferred) — GCP + Azure adapters
+## Part 4 — GCP + Azure adapters ✅ shipped
 
-## Part 5 (deferred) — scheduler polish
+`src/rotation/gcp.ts` — service-account key rotation via `gcloud`:
+`iam service-accounts keys create <file>` → `auth application-default print-access-token` (verify,
+with `GOOGLE_APPLICATION_CREDENTIALS` + isolated `CLOUDSDK_CONFIG`) → `iam service-accounts keys
+delete`. Value is the full key JSON; `extractExternalId` reads `private_key_id`.
+
+`src/rotation/azure.ts` — app client-secret rotation via `az`:
+`ad app credential reset --append --display-name <unique>` → `login --service-principal` (verify,
+isolated `AZURE_CONFIG_DIR`) → `ad app credential delete --key-id`. Because `credential reset` does
+not return the new secret's `keyId`, `create` tags it with a unique display name and looks the keyId
+up via `ad app credential list`. Value format is `keyId:secret`.
+
+## Part 5 — Scheduler polish ✅ shipped
+
+Scheduled = cron/systemd running the batch + finalize commands (no daemon). `doctor.ts` gained a
+"Rotation health" check (pending/due/failed revocation counts). The vault must be initialized with a
+machine key (or a key in the OS keyring) so cron/systemd runs non-interactively.
+
+**cron** (user crontab — off-peak minutes avoid the `:00`/`:30` thundering herd):
+
+```
+# daily — rotate overdue AWS secrets (repeat per provider)
+17 3 * * * keyblind rotate --provider aws --overdue 90 >> ~/.keyblind/rotate.log 2>&1
+# hourly — finalize any revocations past their rollback window
+17 * * * * keyblind rotate --finalize >> ~/.keyblind/rotate.log 2>&1
+```
+
+**systemd** (Linux timer):
+
+```ini
+# /etc/systemd/system/keyblind-rotate.service
+[Unit]
+Description=Keyblind provider-native rotation
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/keyblind rotate --provider aws --overdue 90
+ExecStart=/usr/local/bin/keyblind rotate --finalize
+```
+
+```ini
+# /etc/systemd/system/keyblind-rotate.timer
+[Unit]
+Description=Run Keyblind rotation daily
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+```
 
 ## Verification
 

@@ -1,4 +1,4 @@
-import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret, listRotationNeeded } from "./vault.js";
+import { isInitialized, getKey, listSecrets, checkExpired, resolveSecret, listRotationNeeded, listPendingRevocations, listRevocationsDue } from "./vault.js";
 import { getBackend, listAvailableBackends } from "./backends.js";
 import { getLicenseInfo, getSecretLimit } from "./license.js";
 import { readConfig } from "./config.js";
@@ -155,6 +155,27 @@ export function runDoctor(): CheckResult[] {
       }
     } catch {
       checks.push({ name: "Secret rotation", status: "ok", detail: "Could not check rotation age" });
+    }
+  }
+
+  // 12. Rotation health — pending revocations from provider-native rotation
+  if (isInitialized()) {
+    try {
+      const pending = listPendingRevocations();
+      const due = listRevocationsDue();
+      const failed = pending.filter((r) => r.status === "failed");
+      const awaiting = pending.filter((r) => r.status === "pending");
+      if (pending.length === 0) {
+        checks.push({ name: "Rotation health", status: "ok", detail: "No pending revocations" });
+      } else if (due.length > 0) {
+        checks.push({ name: "Rotation health", status: "warn", detail: `${due.length} revocation${due.length === 1 ? "" : "s"} past the rollback window. Run: keyblind rotate --finalize` });
+      } else if (failed.length > 0) {
+        checks.push({ name: "Rotation health", status: "warn", detail: `${failed.length} revocation${failed.length === 1 ? "" : "s"} failed. Review with: keyblind rotate --pending` });
+      } else {
+        checks.push({ name: "Rotation health", status: "ok", detail: `${awaiting.length} revocation${awaiting.length === 1 ? "" : "s"} awaiting rollback window` });
+      }
+    } catch {
+      checks.push({ name: "Rotation health", status: "ok", detail: "Could not check rotation state" });
     }
   }
 
