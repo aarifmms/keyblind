@@ -14,30 +14,46 @@
 
 ```
 src/
-├── vault.ts        → AES-256-GCM encryption + SQLite store
-├── server.ts       → MCP server (27 tools) + REST API for dashboard
-├── sandbox.ts      → .env sandbox with deterministic fakes (HMAC-SHA256)
-├── backends.ts     → Multi-backend abstraction (local, 1Password, Bitwarden, env)
-├── cli.ts          → CLI entry point (40+ commands)
-├── index.ts        → Public API exports
-├── totp.ts         → TOTP/HOTP 2FA code generation (zero deps)
-├── share.ts        → Encrypted secret sharing via URL fragments
-├── deadman.ts      → Dead man's switch with email notification
-├── sso.ts          → SSO/OIDC authentication for team vaults
-├── setup-mcp.ts    → Auto-configure MCP for Claude Code (`keyblind setup-mcp`)
-├── auth.ts         → Biometric authentication gate
-├── license.ts      → Ed25519 license key verification
-├── team.ts         → Shared team vaults (git-safe)
-├── sync.ts         → Version history, rollback, sync bundles
-├── doctor.ts       → Vault health check
-├── config.ts       → Project configuration (.keyblind)
-├── completions.ts  → Shell completions (bash, zsh, fish)
-├── hook.ts         → Pre-commit hook for secret detection
-├── watch.ts        → Watch .env and auto-sandbox
-└── alerts.ts       → Slack/Discord webhook alerts
+├── vault.ts         → AES-256-GCM encryption + SQLite store (secrets, history, rotation tables)
+├── server.ts        → MCP server (27 tools) + REST API for dashboard
+├── sandbox.ts       → .env sandbox with deterministic fakes (HMAC-SHA256)
+├── backends.ts      → Multi-backend abstraction (local, 1Password, Bitwarden, env, AWS, GCP, Azure)
+├── cli.ts           → CLI entry point (80+ commands/subcommands)
+├── index.ts         → Public API exports
+├── version.ts       → Version constant
+├── totp.ts          → TOTP/HOTP 2FA code generation (zero deps)
+├── share.ts         → Encrypted secret sharing via URL fragments
+├── deadman.ts       → Dead man's switch with email notification
+├── sso.ts           → SSO/OIDC authentication for team vaults
+├── setup-mcp.ts     → Auto-configure MCP for Claude Code (`keyblind setup-mcp`)
+├── auth.ts          → Biometric authentication gate
+├── license.ts       → Ed25519 license key verification
+├── team.ts          → Shared team vaults (git-safe)
+├── sync.ts          → Version history, rollback, sync bundles
+├── doctor.ts        → Vault health check
+├── config.ts        → Project configuration (.keyblind)
+├── completions.ts   → Shell completions (bash, zsh, fish)
+├── hook.ts          → Pre-commit hook + repo secret scanning
+├── watch.ts         → Watch .env and auto-sandbox
+├── alerts.ts        → Slack/Discord webhook alerts
+├── keychain.ts      → Cross-platform key storage (macOS Keychain / libsecret / DPAPI)
+├── ledger.ts        → Know Your Agent ledger (append-only, hash-chained, Ed25519-signed)
+├── approvals.ts     → Human-in-the-loop agent write approvals
+├── ci.ts            → CI/CD secret injection (bundles → $GITHUB_ENV)
+├── control-plane.ts → Central control plane (signed value-free export + deny list)
+├── org-sync.ts      → Hosted control-plane sync (group→scope manifest)
+├── agent-token.ts   → Short-lived org-issued agent tokens
+├── rotation.ts      → Provider-agnostic rotation engine (rollback window)
+└── rotation/        → Provider adapters
+    ├── aws.ts       → AWS IAM access-key rotation
+    ├── gcp.ts       → GCP service-account key rotation
+    └── azure.ts     → Azure app client-secret rotation
 
-dashboard/          → Next.js web dashboard (app.keyblind.dev)
-browser-extension/  → Chrome extension (MV3, paste interception)
+dashboard/            → Local web dashboard (served at localhost:4318)
+hosted/               → Hosted Next.js app (app.keyblind.dev — purchase + control plane)
+landing/              → Marketing site (keyblind.dev)
+browser-extension/    → Chrome extension (MV3, paste interception)
+terraform-provider-keyblind/ → Terraform provider (Go)
 ```
 
 ## Commands
