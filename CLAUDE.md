@@ -95,3 +95,11 @@ keyblind setup-mcp    # Auto-configure Claude Code MCP
 ## Direct Competitor
 
 **Cloak** (getcloak.dev, launched May 25 2026) — Rust CLI + VS Code extension. Sandboxes .env files with AES-256-GCM, Touch ID gate. No MCP support. VS Code/Cursor only.
+
+## Context hygiene (for AI sessions)
+
+- Never `Read`/`cat` `keyblind.mcpb` (12 MB distribution bundle) or the `.jsonl`
+  transcripts under `~/.claude-deepseek/projects/` — use `unzip -l` for the bundle
+  and a narrow `grep` for transcripts. They will overflow the context window.
+- Read files in chunks (`Read` with `offset`/`limit`) rather than whole files.
+- Test suite is 234 tests (1 platform-skipped); `npm test` finishes in ~1s locally.
