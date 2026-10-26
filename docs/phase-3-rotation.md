@@ -66,7 +66,8 @@ interface RotationProvider {
 `create-access-key` → `sts get-caller-identity` → `update-access-key --status Inactive` +
 `delete-access-key`. Value format is `AccessKeyId:SecretAccessKey`; `extractExternalId` returns the
 id part. `verify` runs STS with the new key via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env
-(clearing any profile). Covered by `tests/rotation-aws.test.ts` (mocked `aws` CLI).
+(which take precedence over any profile) and retries with backoff while IAM propagates the key.
+Covered by `tests/rotation-aws.test.ts` (mocked `aws` CLI).
 
 ## Part 3 — CLI (`src/cli.ts`) ✅ shipped
 
@@ -141,3 +142,19 @@ WantedBy=timers.target
    `rotation_pending → revoked`, audit written.
 3. Kill mid-rotation (after create, before finalize) → old key still valid; `--finalize` cleans up.
 4. Verify-failure path: vault reverts, just-created key deleted.
+
+## Real-account validation (Oct 2026)
+
+All three adapters were run against real cloud accounts via
+`scripts/validate-rotation.mjs`, which drives each adapter's
+`create` → `verify` → `revoke` → `extractExternalId` cycle on a throwaway target.
+
+| Provider | Result | Findings |
+|----------|--------|----------|
+| AWS IAM | ✅ PASS | Two bugs fixed: (1) `AWS_PROFILE=""` made the CLI fail with "profile () could not be found"; (2) a fresh access key returns `InvalidClientTokenId` for ~9s — `verify` now retries with backoff. |
+| GCP service account | ✅ PASS | None. |
+| Azure app credential | ✅ PASS | Fresh client secret returns `AADSTS7000215` for ~10s — `verify` now retries with backoff. |
+
+The common finding: freshly minted cloud credentials are not immediately usable.
+AWS and Azure both have a seconds-long propagation window, so `verify` retries
+(with backoff, up to 30s) rather than treating the first `Invalid*` as failure.

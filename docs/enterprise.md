@@ -50,10 +50,13 @@ is the defining enterprise gap and the roadmap below is built around it.
    passphrase; agent identity is a name/email string. Phase 2a adds orgs, roles,
    and group→scope grants, but SSO/OIDC login, SCIM, and short-lived signed
    credentials are still outstanding.
-3. **Rotation is automated, but not yet validated live.** Phase 3 shipped
-   provider-native rotation (AWS IAM / GCP service-account / Azure app-credential)
-   with a rollback window and audit trail. The adapters pass mocked-CLI tests but
-   have not run against real cloud accounts yet.
+3. **Rotation is automated and validated live.** Phase 3 shipped provider-native
+   rotation (AWS IAM / GCP service-account / Azure app-credential) with a rollback
+   window and audit trail. All three adapters have been run against real cloud
+   accounts (Oct 2026); that surfaced and fixed two propagation bugs — AWS IAM
+   access keys and Azure app client secrets both take several seconds to become
+   usable after creation, so `verify` now retries with backoff. (`scripts/validate-rotation.mjs`
+   is the live create/verify/revoke harness.)
 4. **Compliance is documented, not certified.** Phase 4 shipped a SOC 2 / ISO 27001
    narrative (`compliance.md`) and a key-escrow/recovery policy (`key-escrow.md`).
    There is no formal certification and no N-of-M threshold escrow.
