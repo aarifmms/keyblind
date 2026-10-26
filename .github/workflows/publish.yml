@@ -35,6 +35,10 @@ jobs:
         run: npm ci
         working-directory: dashboard
 
+      - name: Install hosted dependencies
+        run: npm ci
+        working-directory: hosted
+
       - name: Test
         run: npm test
         env:
