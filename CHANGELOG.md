@@ -4,6 +4,45 @@ All notable changes to Keyblind are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-10-25
+
+### Added
+
+- **Phase 2 — Identity and RBAC (a/b/c).**
+  - **2a (RBAC core):** hosted control plane backed by Turso/libSQL with orgs,
+    members (`owner`/`admin`/`member`), groups, and group→scope grants. The
+    hosted service signs a value-free manifest (deny list + group-derived
+    scopes) with the org Ed25519 key; local vaults `control-plane sync` and
+    enforce it at the same choke point as agent scope.
+  - **2b (SSO + short-lived credentials):** multi-provider OIDC SSO (discovery,
+    PKCE S256, nonce, `id_token` verification, `(issuer, sub)` linking); plus
+    short-lived agent credentials — nonce/expiry-bound self-signed requests
+    (single-use `used_nonces`) and org-issued `keyblind-agent-token-v1` tokens.
+  - **2c (multi-org + provisioning + logout):** multi-org membership with an
+    active-org switcher, SSO auto-provisioning by slug, and IdP end-session via
+    back-channel logout + refresh-token revocation.
+- **Phase 3 — provider-native rotation.** `keyblind rotate <name> --provider
+  aws|gcp|azure` rotates the credential in the cloud and the vault in one
+  command, with a rollback window (`--rollback-window`, `--finalize`,
+  `--pending`) and full audit trail. Adapters: AWS IAM access keys, GCP
+  service-account keys, Azure app client secrets.
+- **Phase 4 — compliance & support.** SOC 2 / ISO 27001 narrative
+  (`docs/compliance.md`), key-escrow/recovery policy (`docs/key-escrow.md`),
+  and an `enterprise` license tier with a support SLA (`docs/support-sla.md`).
+
+### Fixed
+
+- AWS rotation `verify` dropped an empty `AWS_PROFILE` that broke STS calls, and
+  now retries with backoff while a freshly created access key propagates (~9s).
+- Azure rotation `verify` retries with backoff while a freshly created client
+  secret propagates (~10s, `AADSTS7000215`).
+- SSO callback provider lookup and 401 handling on unauthenticated org routes.
+
+### Docs
+
+- Recorded live validation of the three rotation adapters against real cloud
+  accounts (`docs/phase-3-rotation.md`).
+
 ## [0.9.1] - 2026-10-23
 
 ### Added
@@ -103,6 +142,7 @@ First tagged stable release with the full feature set: local encrypted vault, MC
 team vaults, CLI pairing, web dashboard, Chrome extension, sandboxing, TOTP, secret sharing,
 dead man's switch, SSO, and the Know Your Agent ledger.
 
+[0.9.2]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.2
 [0.9.1]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.1
 [0.9.0]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.0
 [0.8.8]: https://github.com/aarifmms/keyblind/releases/tag/v0.8.8
