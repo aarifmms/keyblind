@@ -52,8 +52,11 @@ const CHECKS = {
   },
   gcp: {
     present: () => sh("gcloud", ["--version"]),
-    auth: () => sh("gcloud", ["auth", "list", "--filter=status:ACTIVE", "--format=value(account)"]),
-    hint: "gcloud auth login       (then gcloud auth application-default login)",
+    auth: () => {
+      const acct = sh("gcloud", ["config", "get-value", "account"]);
+      return acct && acct !== "(unset)" ? acct : null;
+    },
+    hint: "gcloud auth login",
   },
   azure: {
     present: () => sh("az", ["--version"]),

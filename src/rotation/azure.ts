@@ -13,6 +13,10 @@ function runAz(args: string[], env?: Record<string, string>): string {
   return result.trim();
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function requireAppId(ctx: RotationContext): string {
   const appId = ctx.appId;
   if (!appId) {
@@ -60,14 +64,25 @@ export const azureAppCredentialRotationProvider: RotationProvider = {
     const { secret } = splitValue(value);
     if (!secret) return false;
     const dir = mkdtempSync(join(tmpdir(), "keyblind-az-"));
+    const args = ["login", "--service-principal", "-u", appId, "-p", secret];
+    if (ctx.tenant) args.push("--tenant", ctx.tenant);
+    args.push("--allow-no-subscriptions", "--output", "none");
     try {
-      const args = ["login", "--service-principal", "-u", appId, "-p", secret];
-      if (ctx.tenant) args.push("--tenant", ctx.tenant);
-      args.push("--allow-no-subscriptions", "--output", "none");
-      runAz(args, { AZURE_CONFIG_DIR: join(dir, "config") });
-      return true;
-    } catch {
-      return false;
+      // A freshly created client secret can return AADSTS7000215 (invalid client
+      // secret) for several seconds until Entra ID propagates it. Retry until it
+      // is accepted (or the window expires).
+      const deadline = Date.now() + 30_000;
+      let delay = 1000;
+      for (;;) {
+        try {
+          runAz(args, { AZURE_CONFIG_DIR: join(dir, "config") });
+          return true;
+        } catch {
+          if (Date.now() >= deadline) return false;
+          await sleep(delay);
+          delay = Math.min(delay * 2, 8000);
+        }
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -59,11 +59,18 @@ describe("azureAppCredentialRotationProvider", () => {
     expect(call[2].env.AZURE_CONFIG_DIR).toBeTruthy();
   });
 
-  it("returns false when login fails", async () => {
-    mocks.execFileSync.mockImplementation(() => {
-      throw new Error("invalid client secret");
-    });
-    expect(await azureAppCredentialRotationProvider.verify({ appId: "APP123" }, "KEYID123:SECRET123")).toBe(false);
+  it("returns false when login fails after the retry window", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.execFileSync.mockImplementation(() => {
+        throw new Error("invalid client secret");
+      });
+      const result = azureAppCredentialRotationProvider.verify({ appId: "APP123" }, "KEYID123:SECRET123");
+      await vi.runAllTimersAsync();
+      expect(await result).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns false for a malformed value", async () => {
