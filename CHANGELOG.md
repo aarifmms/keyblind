@@ -4,6 +4,20 @@ All notable changes to Keyblind are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-10-26
+
+### Fixed
+
+- Split the dashboard build out of `npm run build` so the MCP server builds
+  standalone without the dashboard's dependencies (fixes Docker/Glama builds that
+  failed with a missing `dashboard/node_modules`).
+- Log vault auto-initialization to stderr instead of stdout so `KEYBLIND_AUTO_INIT`
+  no longer corrupts the stdio MCP handshake under an HTTP proxy.
+
+### Docs
+
+- Simplified the Agensi listing free-tier copy.
+
 ## [0.9.3] - 2026-10-25
 
 ### Added
@@ -160,6 +174,7 @@ First tagged stable release with the full feature set: local encrypted vault, MC
 team vaults, CLI pairing, web dashboard, Chrome extension, sandboxing, TOTP, secret sharing,
 dead man's switch, SSO, and the Know Your Agent ledger.
 
+[0.9.5]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.5
 [0.9.3]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.3
 [0.9.2]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.2
 [0.9.1]: https://github.com/aarifmms/keyblind/releases/tag/v0.9.1
