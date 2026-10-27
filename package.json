@@ -12,10 +12,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc --emitDeclarationOnly && node scripts/build.mjs && node scripts/build-dashboard.mjs",
+    "build": "tsc --emitDeclarationOnly && node scripts/build.mjs",
+    "build:dashboard": "node scripts/build-dashboard.mjs",
+    "build:full": "npm run build && npm run build:dashboard",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build:full",
     "test": "vitest run",
     "test:watch": "vitest"
   },
