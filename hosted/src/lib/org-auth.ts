@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { requireSession, ORG_COOKIE, type SessionUser } from "./auth";
-import { getOrgForUser, type OrgRow, type Role } from "./org";
+import { getOrgForUser, getOrgPlan, type OrgRow, type Role, type Plan } from "./org";
 
 export class ApiError extends Error {
   constructor(message: string, public status = 400) {
@@ -24,6 +24,22 @@ export async function requireOrgRole(roles: Role[]): Promise<{ user: SessionUser
   if (!roles.includes(membership.role)) throw new ApiError("Forbidden", 403);
 
   return { user, org: membership.org, role: membership.role };
+}
+
+const PLAN_RANK: Record<Plan, number> = { free: 0, team: 1, enterprise: 2 };
+
+// requireOrgRole + a plan gate. Reads the org's plan fresh from the DB (not the
+// session JWT) so a plan change takes effect on the next request, not next login.
+export async function requireOrgPlan(
+  minPlan: Plan,
+  roles: Role[] = ["owner", "admin", "member"],
+): Promise<{ user: SessionUser; org: OrgRow; role: Role; plan: Plan }> {
+  const { user, org, role } = await requireOrgRole(roles);
+  const plan = await getOrgPlan(org.id);
+  if (PLAN_RANK[plan] < PLAN_RANK[minPlan]) {
+    throw new ApiError("Requires Team plan", 402);
+  }
+  return { user, org, role, plan };
 }
 
 // requireSession, but an auth failure surfaces as a 401 ApiError instead of the

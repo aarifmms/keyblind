@@ -4,6 +4,16 @@ import { generateOrgKey } from "./org-key";
 
 export type Role = "owner" | "admin" | "member";
 
+export type Plan = "free" | "team" | "enterprise";
+
+export interface OrgBilling {
+  plan: Plan;
+  seatCount: number;
+  seatLimit: number;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+}
+
 export interface UserRow {
   id: string;
   email: string;
@@ -261,6 +271,76 @@ export async function listMembers(orgId: string): Promise<MemberRow[]> {
     role: String(row.role) as Role,
     joinedAt: String(row.joinedAt),
   }));
+}
+
+export async function getOrgPlan(orgId: string): Promise<Plan> {
+  await migrate();
+  const db = getDb();
+  const r = await db.execute({ sql: "SELECT plan FROM orgs WHERE id = ?", args: [orgId] });
+  if (r.rows.length === 0) return "free";
+  const plan = String(r.rows[0].plan);
+  return plan === "team" || plan === "enterprise" ? plan : "free";
+}
+
+export async function getOrgBilling(orgId: string): Promise<OrgBilling> {
+  await migrate();
+  const db = getDb();
+  const [orgRow, countRow] = await Promise.all([
+    db.execute({
+      sql: "SELECT plan, seat_limit AS seatLimit, stripe_customer_id AS stripeCustomerId, stripe_subscription_id AS stripeSubscriptionId FROM orgs WHERE id = ?",
+      args: [orgId],
+    }),
+    db.execute({ sql: "SELECT COUNT(*) AS n FROM org_members WHERE org_id = ?", args: [orgId] }),
+  ]);
+  if (orgRow.rows.length === 0) {
+    return { plan: "free", seatCount: 0, seatLimit: 3, stripeCustomerId: null, stripeSubscriptionId: null };
+  }
+  const o = orgRow.rows[0];
+  const plan = String(o.plan);
+  return {
+    plan: plan === "team" || plan === "enterprise" ? plan : "free",
+    seatCount: Number(countRow.rows[0]?.n ?? 0),
+    seatLimit: o.seatLimit == null ? 3 : Number(o.seatLimit),
+    stripeCustomerId: o.stripeCustomerId == null ? null : String(o.stripeCustomerId),
+    stripeSubscriptionId: o.stripeSubscriptionId == null ? null : String(o.stripeSubscriptionId),
+  };
+}
+
+export async function setOrgPlan(
+  orgId: string,
+  opts: { plan?: Plan; seatLimit?: number; stripeCustomerId?: string | null; stripeSubscriptionId?: string | null },
+): Promise<void> {
+  await migrate();
+  const db = getDb();
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  if (opts.plan !== undefined) {
+    sets.push("plan = ?");
+    args.push(opts.plan);
+  }
+  if (opts.seatLimit !== undefined) {
+    sets.push("seat_limit = ?");
+    args.push(opts.seatLimit);
+  }
+  if (opts.stripeCustomerId !== undefined) {
+    sets.push("stripe_customer_id = ?");
+    args.push(opts.stripeCustomerId);
+  }
+  if (opts.stripeSubscriptionId !== undefined) {
+    sets.push("stripe_subscription_id = ?");
+    args.push(opts.stripeSubscriptionId);
+  }
+  if (sets.length === 0) return;
+  args.push(orgId);
+  await db.execute({ sql: `UPDATE orgs SET ${sets.join(", ")} WHERE id = ?`, args });
+}
+
+export async function getOrgIdByStripeCustomerId(customerId: string): Promise<string | null> {
+  await migrate();
+  const db = getDb();
+  const r = await db.execute({ sql: "SELECT id FROM orgs WHERE stripe_customer_id = ?", args: [customerId] });
+  if (r.rows.length === 0) return null;
+  return String(r.rows[0].id);
 }
 
 export async function inviteMember(orgId: string, email: string, name?: string): Promise<MemberRow> {

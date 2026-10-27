@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Shield, LogOut, Mail, BadgeCheck, Calendar } from "lucide-react";
+import { Shield, LogOut, Mail, BadgeCheck, Calendar, CreditCard } from "lucide-react";
 import { verifySessionToken, ORG_COOKIE } from "@/lib/auth";
 import { listOrgsForUser } from "@/lib/org";
 import OrgSwitcher from "./org-switcher";
@@ -70,6 +70,14 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
+
+          <a
+            href="/dashboard/billing"
+            className="w-full flex items-center justify-center gap-2 border border-[#30363d] text-[#c9d1d9] rounded-md py-2 text-sm hover:bg-[#21262d] transition-colors mb-2"
+          >
+            <CreditCard className="w-4 h-4" />
+            Billing
+          </a>
 
           <form action={isSso ? "/api/auth/sso/logout" : "/api/auth/signout"} method="post">
             <button

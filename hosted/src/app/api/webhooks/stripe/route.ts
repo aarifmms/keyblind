@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { generateLicenseKey } from "@/lib/license-gen";
+import { setOrgPlan, getOrgIdByStripeCustomerId } from "@/lib/org";
 
 async function sendLicenseEmail(email: string, licenseKey: string, tier: string, expDate: string): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -55,6 +56,22 @@ export async function POST(req: Request): Promise<Response> {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as any;
+
+    // Team subscription flow: checkout sessions we create carry org_id in metadata.
+    if (session.metadata?.org_id) {
+      const orgId = session.metadata.org_id;
+      const quantity = parseInt(session.metadata?.quantity || "1", 10);
+      await setOrgPlan(orgId, {
+        plan: "team",
+        seatLimit: quantity,
+        stripeCustomerId: session.customer ?? null,
+        stripeSubscriptionId: session.subscription ?? null,
+      });
+      console.log(`Team subscription activated: org=${orgId} seats=${quantity}`);
+      return Response.json({ success: true, message: "Team subscription activated" });
+    }
+
+    // Pro license flow (one-time Payment Link).
     const customerEmail = session.customer_details?.email || session.customer_email;
     const tier = session.metadata?.tier || "pro";
     const expYears = parseInt(session.metadata?.expiry_years || "1", 10);
@@ -79,6 +96,29 @@ export async function POST(req: Request): Promise<Response> {
       console.error("License generation failed:", err.message);
       return Response.json({ error: "License generation failed" }, { status: 500 });
     }
+  }
+
+  if (event.type === "customer.subscription.updated") {
+    const sub = event.data.object as any;
+    const customerId = sub.customer as string | undefined;
+    if (!customerId) return Response.json({ received: true });
+    const orgId = await getOrgIdByStripeCustomerId(customerId);
+    if (!orgId) return Response.json({ received: true });
+    const quantity = sub.items?.data?.[0]?.quantity ?? 1;
+    const active = sub.status === "active" || sub.status === "trialing";
+    await setOrgPlan(orgId, { plan: active ? "team" : "free", seatLimit: quantity });
+    return Response.json({ received: true });
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const sub = event.data.object as any;
+    const customerId = sub.customer as string | undefined;
+    if (!customerId) return Response.json({ received: true });
+    const orgId = await getOrgIdByStripeCustomerId(customerId);
+    if (!orgId) return Response.json({ received: true });
+    await setOrgPlan(orgId, { plan: "free", seatLimit: 3, stripeSubscriptionId: null });
+    console.log(`Team subscription canceled: org=${orgId}`);
+    return Response.json({ received: true });
   }
 
   return Response.json({ received: true });

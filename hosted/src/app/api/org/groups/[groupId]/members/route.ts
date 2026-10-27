@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { addGroupMember } from "@/lib/org";
-import { requireOrgRole, ApiError } from "@/lib/org-auth";
+import { requireOrgPlan, ApiError } from "@/lib/org-auth";
 
 export async function POST(req: Request, { params }: { params: Promise<{ groupId: string }> }) {
   try {
-    const { org } = await requireOrgRole(["owner", "admin"]);
+    const { org } = await requireOrgPlan("team", ["owner", "admin"]);
     const { groupId } = await params;
     const body = (await req.json().catch(() => ({}))) as { userId?: string };
     const userId = typeof body.userId === "string" ? body.userId : "";

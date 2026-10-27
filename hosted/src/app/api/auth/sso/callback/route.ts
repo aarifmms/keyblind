@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getProvider, exchangeCode, verifyIdToken, verifyOidcState } from "@/lib/oidc";
 import { createSessionToken, setActiveOrgCookie, SESSION_MAX_AGE } from "@/lib/auth";
 import { createSession } from "@/lib/sessions";
-import { findOrCreateUserByIdentity, getOrgForUser, applySsoGroupMapping, provisionSsoUser } from "@/lib/org";
+import { findOrCreateUserByIdentity, getOrgForUser, getOrgPlan, applySsoGroupMapping, provisionSsoUser } from "@/lib/org";
 
 const STATE_COOKIE = "keyblind_oidc_state";
 
@@ -83,9 +83,10 @@ export async function GET(req: Request) {
       expiresAt,
     });
 
+    const plan = membership ? await getOrgPlan(membership.org.id) : "free";
     const token = await createSessionToken({
       email: user.email,
-      tier: "team",
+      tier: plan,
       userId: user.id,
       orgId: membership?.org.id,
       role: membership?.role,

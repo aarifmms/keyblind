@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listMembers, inviteMember } from "@/lib/org";
+import { listMembers, inviteMember, getOrgBilling } from "@/lib/org";
 import { requireOrgRole, ApiError } from "@/lib/org-auth";
 
 export async function GET() {
@@ -20,6 +20,12 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as { email?: string; name?: string };
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     if (!email) throw new ApiError("Email is required", 400);
+    const billing = await getOrgBilling(org.id);
+    const members = await listMembers(org.id);
+    const alreadyMember = members.some((m) => m.email === email);
+    if (!alreadyMember && members.length >= billing.seatLimit) {
+      throw new ApiError("Seat limit reached. Upgrade to Team to add more members.", 402);
+    }
     const member = await inviteMember(org.id, email, typeof body.name === "string" ? body.name : undefined);
     return NextResponse.json({ member }, { status: 201 });
   } catch (err) {

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { listAgents } from "@/lib/org";
-import { requireOrgRole, ApiError } from "@/lib/org-auth";
+import { requireOrgPlan, ApiError } from "@/lib/org-auth";
 import { mintAgentToken } from "@/lib/agent-token";
 
 export async function POST(req: Request, { params }: { params: Promise<{ agentId: string }> }) {
   try {
-    const { org, user, role } = await requireOrgRole(["owner", "admin", "member"]);
+    const { org, user, role } = await requireOrgPlan("team");
     const { agentId } = await params;
     const body = (await req.json().catch(() => ({}))) as { scope?: string; ttl?: number };
     const scope = typeof body.scope === "string" ? body.scope : "";

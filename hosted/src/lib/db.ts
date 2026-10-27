@@ -27,6 +27,10 @@ async function runMigrate(): Promise<void> {
       enc_private_key TEXT NOT NULL,
       enc_iv TEXT NOT NULL,
       enc_tag TEXT NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'free',
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      seat_limit INTEGER NOT NULL DEFAULT 3,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS users (
@@ -95,4 +99,23 @@ async function runMigrate(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_sessions_issuer_sid ON sessions(issuer, sid)`,
   ];
   await db.batch(statements, "write");
+  await ensureColumns();
+}
+
+// Adds columns introduced after the initial schema to already-existing databases.
+// `CREATE TABLE IF NOT EXISTS` never alters an existing table, so column additions
+// must be applied here, guarded by a pragma check so the ALTER is idempotent.
+async function ensureColumns(): Promise<void> {
+  const db = getDb();
+  const additions: { table: string; column: string; ddl: string }[] = [
+    { table: "orgs", column: "plan", ddl: "ALTER TABLE orgs ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'" },
+    { table: "orgs", column: "stripe_customer_id", ddl: "ALTER TABLE orgs ADD COLUMN stripe_customer_id TEXT" },
+    { table: "orgs", column: "stripe_subscription_id", ddl: "ALTER TABLE orgs ADD COLUMN stripe_subscription_id TEXT" },
+    { table: "orgs", column: "seat_limit", ddl: "ALTER TABLE orgs ADD COLUMN seat_limit INTEGER NOT NULL DEFAULT 3" },
+  ];
+  for (const { table, column, ddl } of additions) {
+    const info = await db.execute({ sql: `PRAGMA table_info(${table})`, args: [] });
+    const exists = info.rows.some((r) => String(r.name) === column);
+    if (!exists) await db.execute(ddl);
+  }
 }

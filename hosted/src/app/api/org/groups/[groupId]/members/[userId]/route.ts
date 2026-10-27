@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { removeGroupMember } from "@/lib/org";
-import { requireOrgRole, ApiError } from "@/lib/org-auth";
+import { requireOrgPlan, ApiError } from "@/lib/org-auth";
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ groupId: string; userId: string }> }) {
   try {
-    const { org } = await requireOrgRole(["owner", "admin"]);
+    const { org } = await requireOrgPlan("team", ["owner", "admin"]);
     const { groupId, userId } = await params;
     await removeGroupMember(org.id, groupId, userId);
     return NextResponse.json({ success: true });

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { listGroups, createGroup } from "@/lib/org";
-import { requireOrgRole, ApiError } from "@/lib/org-auth";
+import { requireOrgPlan, ApiError } from "@/lib/org-auth";
 
 export async function GET() {
   try {
-    const { org } = await requireOrgRole(["owner", "admin", "member"]);
+    const { org } = await requireOrgPlan("team");
     const groups = await listGroups(org.id);
     return NextResponse.json({ groups });
   } catch (err) {
@@ -16,7 +16,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { org } = await requireOrgRole(["owner", "admin"]);
+    const { org } = await requireOrgPlan("team", ["owner", "admin"]);
     const body = (await req.json().catch(() => ({}))) as { name?: string; scope?: string };
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) throw new ApiError("Name is required", 400);
