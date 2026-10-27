@@ -53,6 +53,6 @@ The agent calls MCP tools such as `resolve_secret`, `store_secret`, `list_secret
 - **Zero network, zero telemetry** - fully local, no cloud, no accounts
 - **Machine-identity-bound key** - encryption key wrapped with a machine fingerprint
 
-## Pricing
+## Free
 
-Free: 5 secrets with all 27 tools. Fully usable - no purchase required.
+Free and fully usable - all 27 tools included, no purchase required.
