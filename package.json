@@ -41,11 +41,11 @@
     "url": "git+https://github.com/aarifmms/keyblind.git"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^13.0.3",
     "zod": "^4.4.3"
   },
   "overrides": {
