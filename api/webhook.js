@@ -78,6 +78,13 @@ export async function POST(req) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
+
+    // Team subscription checkouts carry org_id metadata and are handled by the
+    // hosted control-plane webhook (app.keyblind.dev/api/webhooks/stripe).
+    if (session.metadata?.org_id) {
+      return Response.json({ received: true });
+    }
+
     const customerEmail = session.customer_details?.email || session.customer_email;
     const tier = session.metadata?.tier || "pro";
     const expYears = parseInt(session.metadata?.expiry_years || "1", 10);
