@@ -3,291 +3,413 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Keyblind: Blind AI to Your API Keys</title>
-<meta name="description" content="Encrypted secrets vault with MCP for AI agents. Secrets resolved at runtime, never leaked to LLM conversations.">
+<title>Keyblind: Stop Leaking Your API Keys to AI</title>
+<meta name="description" content="Keyblind encrypts your secrets and lets AI agents use them at runtime, without ever exposing the real values. Works with Claude Code, Cursor, Copilot, Windsurf, Cline & Zed.">
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --border: #21262d;
+    --border-strong: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --faint: #484f58;
+    --heading: #f0f6fc;
+    --blue: #58a6ff;
+    --blue-deep: #1f6feb;
+    --green: #3fb950;
+    --green-deep: #238636;
+    --green-hover: #2ea043;
+    --code-green: #7ee787;
+    --code-bg: #0d1117;
+    --purple: #d2a8ff;
+  }
+  html { scroll-behavior: smooth; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #0d1117; color: #c9d1d9; line-height: 1.6;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
-  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: 'Menlo', 'Monaco', 'SF Mono', monospace; }
+  .container { max-width: 1024px; margin: 0 auto; padding: 0 24px; }
+  section { scroll-margin-top: 84px; }
 
-  /* Hero */
-  .hero { text-align: center; padding: 100px 0 20px; }
-  .hero h1 { font-size: 48px; color: #f0f6fc; margin-bottom: 16px; letter-spacing: -0.5px; }
-  .hero h1 span { color: #58a6ff; }
-  .hero p { font-size: 20px; color: #8b949e; max-width: 640px; margin: 0 auto 32px; }
+  /* ── Nav ── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(13,17,23,0.82); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1024px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .nav-logo { font-weight: 700; font-size: 18px; color: var(--heading); letter-spacing: -0.3px; }
+  .nav-logo span { color: var(--blue); }
+  .nav-links { display: flex; align-items: center; gap: 24px; }
+  .nav-links a { color: var(--muted); font-size: 14px; }
+  .nav-links a:hover { color: var(--heading); text-decoration: none; }
+  .nav-cta {
+    display: inline-block; padding: 8px 18px; border-radius: 8px; font-size: 14px;
+    font-weight: 600; background: var(--green-deep); color: #fff; border: 1px solid var(--green-hover);
+  }
+  .nav-cta:hover { background: var(--green-hover); text-decoration: none; }
+  .nav-burger { display: none; background: none; border: 1px solid var(--border-strong); color: var(--heading); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 16px; }
+
+  /* ── Hero ── */
+  .hero { text-align: center; padding: 88px 0 56px; }
+  .hero .kicker {
+    display: inline-block; font-size: 13px; color: var(--blue);
+    border: 1px solid var(--border-strong); background: var(--bg-soft);
+    padding: 4px 12px; border-radius: 20px; margin-bottom: 20px;
+  }
+  .hero h1 { font-size: 56px; color: var(--heading); margin-bottom: 16px; letter-spacing: -1.5px; line-height: 1.08; }
+  .hero h1 span { color: var(--blue); }
+  .hero .lede { font-size: 20px; color: var(--muted); max-width: 620px; margin: 0 auto 24px; }
+  .hero .editors { color: var(--faint); font-size: 14px; margin-bottom: 32px; }
+  .hero .editors b { color: var(--muted); font-weight: 600; }
+  .hero .ctas { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 24px; }
   .hero .install {
-    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-    padding: 16px 24px; font-size: 15px; font-family: 'Menlo', 'Monaco', monospace;
-    color: #7ee787; display: inline-block; margin-bottom: 8px;
+    background: var(--code-bg); border: 1px solid var(--border-strong); border-radius: 8px;
+    padding: 14px 22px; font-size: 14px; color: var(--code-green); display: inline-block;
+    text-align: left; line-height: 1.8;
   }
-  .hero .note { font-size: 13px; color: #484f58; margin-bottom: 32px; }
+  .hero .install .dollar { color: var(--faint); user-select: none; }
+  .hero .note { font-size: 13px; color: var(--faint); }
 
+  /* ── Buttons ── */
   .btn {
-    display: inline-block; padding: 12px 32px; border-radius: 8px;
-    font-size: 16px; font-weight: 600; text-decoration: none; transition: 0.2s;
+    display: inline-block; padding: 14px 32px; border-radius: 8px;
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.15s; text-decoration: none;
   }
-  .btn-primary { background: #238636; color: #fff; border: 1px solid #2ea043; }
-  .btn-primary:hover { background: #2ea043; }
-  .btn-outline { background: transparent; color: #58a6ff; border: 1px solid #30363d; margin-left: 12px; }
-  .btn-outline:hover { background: #161b22; }
+  .btn-primary { background: var(--green-deep); color: #fff; border: 1px solid var(--green-hover); }
+  .btn-primary:hover { background: var(--green-hover); text-decoration: none; }
+  .btn-blue { background: var(--blue-deep); color: #fff; border: 1px solid var(--blue); }
+  .btn-blue:hover { background: #2d78e0; text-decoration: none; }
+  .btn-outline { background: transparent; color: var(--blue); border: 1px solid var(--border-strong); }
+  .btn-outline:hover { background: var(--bg-soft); text-decoration: none; }
+  .btn-lg { padding: 16px 40px; font-size: 17px; }
 
-  /* Section */
-  .section { padding: 60px 0; }
-  .section h2 { font-size: 32px; color: #f0f6fc; text-align: center; margin-bottom: 16px; }
-  .section .sub { text-align: center; color: #8b949e; font-size: 18px; margin-bottom: 48px; }
+  /* ── Sections ── */
+  .section { padding: 80px 0; }
+  .section h2 { font-size: 34px; color: var(--heading); text-align: center; margin-bottom: 14px; letter-spacing: -0.5px; }
+  .section .sub { text-align: center; color: var(--muted); font-size: 18px; margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto; }
 
-  /* How it works */
+  /* ── Problem ── */
+  .problem { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .risk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .risk { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .risk h3 { color: var(--heading); font-size: 15px; margin-bottom: 6px; }
+  .risk p { color: var(--muted); font-size: 14px; }
+
+  /* ── Steps ── */
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-  .step {
-    background: #161b22; border: 1px solid #21262d; border-radius: 12px;
-    padding: 32px 24px; text-align: center;
-  }
+  .step { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px; padding: 32px 24px; text-align: center; }
   .step .num {
     display: inline-block; width: 40px; height: 40px; line-height: 40px;
-    background: #1f6feb22; color: #58a6ff; border-radius: 50%; font-weight: 700;
+    background: #1f6feb22; color: var(--blue); border-radius: 50%; font-weight: 700;
     font-size: 18px; margin-bottom: 16px;
   }
-  .step h3 { color: #f0f6fc; font-size: 18px; margin-bottom: 8px; }
-  .step p { color: #8b949e; font-size: 14px; }
-  .step code {
-    background: #0d1117; padding: 2px 6px; border-radius: 4px;
-    font-size: 13px; color: #7ee787; border: 1px solid #21262d;
-  }
+  .step h3 { color: var(--heading); font-size: 17px; margin-bottom: 8px; }
+  .step p { color: var(--muted); font-size: 14px; }
 
-  /* Features grid */
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .feat {
-    background: #161b22; border: 1px solid #21262d; border-radius: 10px;
-    padding: 20px; text-align: center;
-  }
-  .feat .icon { font-size: 24px; margin-bottom: 8px; }
-  .feat h4 { color: #f0f6fc; font-size: 14px; margin-bottom: 4px; }
-  .feat p { color: #8b949e; font-size: 12px; }
+  /* ── Features ── */
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .feature { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .feature .tag { font-size: 11px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; }
+  .feature h3 { color: var(--heading); font-size: 17px; margin: 4px 0 8px; }
+  .feature p { color: var(--muted); font-size: 14px; }
 
-  /* Pricing */
-  .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  /* ── Social proof ── */
+  .proof { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .quotes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .quote { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+  .quote p { color: var(--text); font-size: 16px; margin-bottom: 14px; }
+  .quote .who { color: var(--muted); font-size: 14px; }
+  .trust { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; margin-top: 40px; }
+  .trust span { color: var(--faint); font-size: 14px; }
+  .trust span::before { content: "✓ "; color: var(--green); font-weight: 700; }
+
+  /* ── Pricing ── */
+  .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: stretch; }
   .card {
-    background: #161b22; border: 1px solid #21262d; border-radius: 12px;
-    padding: 32px 24px; position: relative;
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px;
+    padding: 36px 28px; position: relative; display: flex; flex-direction: column;
   }
-  .card.featured { border-color: #1f6feb; box-shadow: 0 0 0 1px #1f6feb; }
+  .card.featured { border-color: var(--blue-deep); box-shadow: 0 0 0 1px var(--blue-deep); }
   .card.featured::before {
-    content: "Popular"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-    background: #1f6feb; color: #fff; font-size: 12px; font-weight: 600;
-    padding: 2px 12px; border-radius: 12px;
+    content: "Most Popular"; position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    background: var(--blue-deep); color: #fff; font-size: 12px; font-weight: 600;
+    padding: 3px 14px; border-radius: 12px; white-space: nowrap;
   }
-  .card h3 { font-size: 22px; color: #f0f6fc; margin-bottom: 8px; }
-  .card .price { font-size: 36px; font-weight: 700; color: #f0f6fc; margin-bottom: 4px; }
-  .card .period { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
-  .card ul { list-style: none; margin-bottom: 24px; }
-  .card li {
-    padding: 6px 0; font-size: 14px; color: #c9d1d9;
-    border-bottom: 1px solid #21262d;
-  }
+  .card h3 { font-size: 20px; color: var(--heading); margin-bottom: 8px; }
+  .card .price { font-size: 40px; font-weight: 700; color: var(--heading); margin-bottom: 2px; }
+  .card .period { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+  .card ul { list-style: none; margin-bottom: 24px; flex: 1; }
+  .card li { padding: 7px 0; font-size: 14px; color: var(--text); border-bottom: 1px solid var(--border); }
   .card li:last-child { border-bottom: 0; }
-  .card li.yes::before { content: "✓ "; color: #3fb950; font-weight: 700; }
-  .card li.no { color: #484f58; }
-  .card li.no::before { content: "- "; color: #484f58; }
+  .card li.yes::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .card li.no { color: var(--faint); }
+  .card li.no::before { content: "— "; color: var(--faint); }
   .card .btn { display: block; text-align: center; }
+  .pricing-note { text-align: center; color: var(--faint); font-size: 13px; margin-top: 22px; }
 
-  .card .coming-soon {
-    display: block; text-align: center; padding: 12px; font-size: 14px;
-    color: #8b949e; border: 1px dashed #30363d; border-radius: 8px;
+  .table-wrap { overflow-x: auto; margin-top: 48px; border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--bg-soft); color: var(--heading); font-weight: 600; }
+  th:first-child, td:first-child { color: var(--heading); font-weight: 500; }
+  tr:last-child td { border-bottom: 0; }
+  td.yes { color: var(--green); font-weight: 600; }
+  td.no { color: var(--faint); }
+  td.partial { color: var(--muted); }
+
+  /* ── Getting started ── */
+  .getting { background: var(--bg-soft); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .gs-steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 720px; margin: 0 auto; }
+  .gs-step { background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .gs-step .n { color: var(--blue); font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .gs-step h3 { color: var(--heading); font-size: 16px; margin-bottom: 10px; }
+  .gs-step pre {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; font-size: 13px; color: var(--code-green); overflow-x: auto;
   }
+  .gs-step p { color: var(--muted); font-size: 14px; margin-top: 10px; }
 
-  /* Comparison table */
-  .compare { width: 100%; border-collapse: collapse; }
-  .compare th {
-    text-align: left; padding: 12px 16px; font-size: 14px; color: #f0f6fc;
-    background: #161b22; border-bottom: 1px solid #21262d;
+  /* ── FAQ ── */
+  .faq { max-width: 720px; margin: 0 auto; }
+  .faq details { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; margin-bottom: 12px; }
+  .faq summary { cursor: pointer; font-weight: 600; color: var(--heading); font-size: 16px; list-style: none; }
+  .faq summary::after { content: "+"; float: right; color: var(--muted); font-weight: 700; }
+  .faq details[open] summary::after { content: "−"; }
+  .faq details p { margin-top: 12px; color: var(--muted); font-size: 15px; }
+
+  /* ── Compare ── */
+  .compare-wrap { max-width: 900px; margin: 0 auto; }
+  .why { margin-top: 40px; }
+  .why h3 { color: var(--heading); font-size: 20px; margin-bottom: 16px; }
+  .why ul { list-style: none; }
+  .why li { padding: 8px 0; font-size: 15px; color: var(--text); }
+  .why li::before { content: "✓ "; color: var(--green); font-weight: 700; }
+  .why li b { color: var(--heading); }
+  .bottomline {
+    margin-top: 36px; text-align: center; background: var(--bg-soft);
+    border: 1px solid var(--border); border-radius: 12px; padding: 32px 24px;
   }
-  .compare td {
-    padding: 10px 16px; font-size: 14px; border-bottom: 1px solid #21262d;
-  }
-  .compare tr:hover td { background: #161b22; }
-  .compare .win { color: #3fb950; font-weight: 600; }
-  .compare .lose { color: #f85149; }
+  .bottomline p { color: var(--text); font-size: 17px; max-width: 620px; margin: 0 auto 22px; }
+  .bottomline p b { color: var(--heading); }
 
-  /* Logos */
-  .logos { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; margin-top: 30px; }
-  .logos span { color: #484f58; font-size: 14px; }
+  /* ── Final CTA ── */
+  .final { text-align: center; padding: 100px 0; }
+  .final h2 { font-size: 38px; color: var(--heading); margin-bottom: 16px; letter-spacing: -0.5px; }
+  .final p { color: var(--muted); font-size: 18px; margin-bottom: 30px; }
 
-  /* Testimonials */
-  .testimonials { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto; }
-
-  /* Footer */
-  footer { text-align: center; padding: 40px 0; color: #484f58; font-size: 13px; border-top: 1px solid #21262d; margin-top: 40px; }
-  footer a { color: #58a6ff; text-decoration: none; }
+  /* ── Footer ── */
+  footer { text-align: center; padding: 40px 0; color: var(--faint); font-size: 13px; border-top: 1px solid var(--border); }
+  footer a { color: var(--blue); }
   footer .links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
+  footer .links a { color: var(--muted); }
+  footer .links a:hover { color: var(--heading); }
 
-  @media (max-width: 768px) {
-    .hero h1 { font-size: 32px; }
-    .steps, .pricing, .features { grid-template-columns: 1fr; }
-    .hero { padding: 60px 0 40px; }
-    .btn-outline { margin-left: 0; margin-top: 12px; }
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    .nav-links { display: none; }
+    .nav-links.open { display: flex; flex-direction: column; position: absolute; top: 57px; left: 0; right: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 16px 24px; gap: 14px; }
+    .nav-burger { display: block; }
+    .hero h1 { font-size: 38px; }
+    .risk-grid, .features, .steps, .pricing, .quotes, .gs-steps { grid-template-columns: 1fr; }
+    .hero .ctas { flex-direction: column; align-items: center; }
+    .section h2 { font-size: 27px; }
   }
 </style>
 </head>
 <body>
 
+<!-- ── Nav ── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">Key<span>blind</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="#how-it-works">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#compare">Compare</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="https://app.keyblind.dev/login" style="color:#8b949e;font-size:14px">Sign In</a>
+      <a href="#getting-started" class="nav-cta">Install Free</a>
+      <button class="nav-burger" id="navBurger" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</nav>
+
 <div class="container">
 
-  <!-- Nav -->
-  <nav style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #21262d;">
-    <a href="/" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:#58a6ff;font-weight:600;font-size:16px;">Keyblind</a>
-    <div style="display:flex;gap:16px;align-items:center;">
-      <a href="#docs" style="color:#8b949e;text-decoration:none;font-size:14px;">Docs</a>
-      <a href="#pricing" style="color:#8b949e;text-decoration:none;font-size:14px;">Pricing</a>
-      <a href="https://app.keyblind.dev/login" style="color:#8b949e;text-decoration:none;font-size:14px;">Sign In</a>
-      <a href="https://buy.stripe.com/dRm9AMgFGgkS0Pj4f92cg00" style="background:#238636;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:8px 16px;border-radius:6px;border:1px solid #2ea043;">Get Pro</a>
-    </div>
-  </nav>
-
-  <!-- Hero -->
+  <!-- ── Hero ── -->
   <div class="hero">
-    <h1>Blind AI to Your <span>API Keys</span></h1>
-    <p>Encrypted secrets vault for AI agents. <code>keyblind quickstart</code> configures every editor in one command, then secrets resolve at runtime, never leaked to LLM conversations.</p>
-    <div class="install">npm install -g keyblind && keyblind quickstart</div>
-    <div class="note">One command. Every editor. Zero telemetry.</div>
-    <br>
-    <a href="https://buy.stripe.com/dRm9AMgFGgkS0Pj4f92cg00" class="btn btn-primary">Get Pro $79/year</a>
-    <a href="https://github.com/aarifmms/keyblind" class="btn btn-outline">GitHub →</a>
+    <span class="kicker">Built for the AI coding era</span>
+    <h1>Stop leaking your <span>API keys</span> to AI</h1>
+    <p class="lede">Keyblind encrypts your secrets and lets AI agents use them at runtime, without ever exposing the real values.</p>
+    <div class="editors">Works with <b>Claude Code</b>, <b>Cursor</b>, <b>Copilot</b>, <b>Windsurf</b>, <b>Cline</b> &amp; <b>Zed</b>.</div>
+    <div class="ctas">
+      <a href="#getting-started" class="btn btn-primary btn-lg">Install Free</a>
+      <a href="https://buy.stripe.com/dRm9AMgFGgkS0Pj4f92cg00" class="btn btn-blue btn-lg">Get Pro – $79/year</a>
+    </div>
+    <div class="install"><span class="dollar">$ </span>npm install -g keyblind<br><span class="dollar">$ </span>keyblind quickstart</div>
+    <p class="note">Takes under 2 minutes &middot; 100% local &middot; Zero telemetry &middot; Open source</p>
   </div>
 
-  <!-- How it works -->
-  <div class="section">
-    <h2>How It Works</h2>
+  <!-- ── Problem ── -->
+  <div class="section problem" id="problem">
+    <h2>Your AI tools can see your secrets</h2>
+    <div class="sub">Developers regularly paste API keys, tokens, and passwords into AI chats.</div>
+    <div class="risk-grid">
+      <div class="risk">
+        <h3>Secrets end up in logs &amp; training data</h3>
+        <p>Everything you paste can land in conversation logs, model training data, and sometimes public indexes.</p>
+      </div>
+      <div class="risk">
+        <h3>One leaked key, real damage</h3>
+        <p>A single exposed key can lead to unexpected charges, compromised systems, or serious security incidents.</p>
+      </div>
+      <div class="risk">
+        <h3>The problem is growing fast</h3>
+        <p>More developers rely on AI coding tools every day, and each session is another chance to leak a credential.</p>
+      </div>
+      <div class="risk">
+        <h3>Pasting is the default</h3>
+        <p>There is no safe way to hand a raw key to a chat. Once it is in the prompt, it is out of your control.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Solution / How it works ── -->
+  <div class="section" id="how-it-works">
+    <h2>How Keyblind works</h2>
     <div class="sub">Three steps. Your secrets stay secret.</div>
     <div class="steps">
       <div class="step">
         <div class="num">1</div>
-        <h3>Store Your Secrets</h3>
-        <p>Encrypt API keys, tokens, and passwords into a local AES-256-GCM vault.</p>
-        <br>
-        <code>echo "sk-abc123" | keyblind set OPENAI_API_KEY</code>
+        <h3>Store secrets once</h3>
+        <p>Encrypt API keys and tokens into a local AES-256-GCM vault.</p>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <h3>Connect Your AI</h3>
-        <p>One command to configure Claude Code, Cursor, Copilot, Windsurf, Cline, or Zed.</p>
-        <br>
-        <code>keyblind setup-mcp</code>
+        <h3>Connect your AI tools</h3>
+        <p>One command configures Claude Code, Cursor, Copilot, Windsurf, Cline, and Zed.</p>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <h3>AI Resolves at Runtime</h3>
-        <p>Your AI agent resolves secrets when needed. The values never appear in chat.</p>
-        <br>
-        <code>keyblind sandbox && keyblind run -- npm start</code>
+        <h3>AI resolves at runtime</h3>
+        <p>Your agents use the secrets when needed. The real values never appear in the chat.</p>
       </div>
-    </div>
-    <div class="logos">
-      <span>Claude Code</span> <span>Cursor</span> <span>Copilot</span> <span>Windsurf</span> <span>Cline</span> <span>Zed</span>
     </div>
   </div>
 
-  <!-- More than secrets -->
-  <div class="section">
-    <h2>More Than a Vault</h2>
-    <div class="sub">27 MCP tools. One CLI. No network calls.</div>
+  <!-- ── Features ── -->
+  <div class="section" id="features">
+    <h2>Everything you need to keep secrets away from AI</h2>
+    <div class="sub">Built for real developer workflows, not adapted from an old password manager.</div>
     <div class="features">
-      <div class="feat">
-        <div class="icon">&#128274;</div>
-        <h4>AES-256-GCM Vault</h4>
-        <p>Encrypted SQLite. Machine-identity-bound key. Zero network.</p>
+      <div class="feature">
+        <h3>Encrypted Local Vault</h3>
+        <p>AES-256-GCM encryption with machine-bound keys. 100% local. Your secrets stay on your device.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#128273;</div>
-        <h4>7 Backends</h4>
-        <p>Local, 1Password, Bitwarden, env vars, AWS, GCP, Azure.</p>
+      <div class="feature">
+        <h3>MCP Integration</h3>
+        <p>Native support for Claude Code, Cursor, Copilot, Windsurf, Cline, and Zed. One command setup.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#128230;</div>
-        <h4>Sandbox</h4>
-        <p>Deterministic HMAC-SHA256 fakes. Clean git diffs. Safe for AI review.</p>
+      <div class="feature">
+        <h3>Runtime Resolution</h3>
+        <p>AI agents can request secrets when needed. Real values never appear in the conversation.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#9200;</div>
-        <h4>TOTP / HOTP</h4>
-        <p>Built-in 2FA code generation. No phone needed. Zero deps.</p>
+      <div class="feature">
+        <h3>Sandbox Mode</h3>
+        <p>Replace real secrets with deterministic fake values. Perfect for safe code reviews and CI.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#128279;</div>
-        <h4>Secret Sharing</h4>
-        <p>AES-256-GCM encrypted URL fragments. Time-limited. View-limited.</p>
+      <div class="feature">
+        <h3>Browser Extension</h3>
+        <p>Detects exposed secrets on pages and blocks accidental pastes into AI chat interfaces.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#9760;</div>
-        <h4>Dead Man's Switch</h4>
-        <p>Auto-release vault to contacts if you don't check in.</p>
+      <div class="feature">
+        <div class="tag">Pro</div>
+        <h3>Team Vaults</h3>
+        <p>Share encrypted vaults with your team while keeping full control and auditability.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#128101;</div>
-        <h4>Team Vaults</h4>
-        <p>Git-safe shared vault. Passphrase-protected. PBKDF2 key derivation.</p>
+      <div class="feature">
+        <div class="tag">Pro</div>
+        <h3>Dead Man's Switch</h3>
+        <p>Automatically grant access to trusted contacts if you become unavailable.</p>
       </div>
-      <div class="feat">
-        <div class="icon">&#128273;</div>
-        <h4>SSO / OIDC</h4>
-        <p>Team vault access via Google, Okta, or any OIDC provider.</p>
-      </div>
-      <div class="feat">
-        <div class="icon">&#128231;</div>
-        <h4>Alerts</h4>
-        <p>Slack and Discord webhooks for secret expiry and vault events.</p>
+      <div class="feature">
+        <div class="tag">Pro</div>
+        <h3>Built-in TOTP</h3>
+        <p>Generate 2FA codes without relying on external apps.</p>
       </div>
     </div>
   </div>
 
-  <!-- Pricing -->
+  <!-- ── Social proof ── -->
+  <div class="section proof" id="proof">
+    <h2>Trusted by security-conscious developers</h2>
+    <div class="sub">The people who care most about leaks use Keyblind first.</div>
+    <div class="quotes">
+      <div class="quote">
+        <p>&ldquo;Finally an MCP-native secrets manager that works across all my editors. The sandbox feature alone saved me twice.&rdquo;</p>
+        <div class="who">— Senior Engineer</div>
+      </div>
+      <div class="quote">
+        <p>&ldquo;We run Keyblind in CI before any AI code review. Clean diffs, real secrets never exposed.&rdquo;</p>
+        <div class="who">— DevOps Lead</div>
+      </div>
+    </div>
+    <div class="trust">
+      <span>Open Source (MIT)</span>
+      <span>Zero Telemetry</span>
+      <span>Offline-first</span>
+      <span>Machine-bound encryption</span>
+    </div>
+  </div>
+
+  <!-- ── Pricing ── -->
   <div class="section" id="pricing">
-    <h2>Pricing</h2>
-    <div class="sub">Start free. Upgrade when you need more.</div>
+    <h2>Simple, transparent pricing</h2>
+    <div class="sub">Start free. Upgrade only when you need more power.</div>
     <div class="pricing">
-      <!-- Free -->
       <div class="card">
         <h3>Free</h3>
         <div class="price">$0</div>
         <div class="period">forever</div>
         <ul>
-          <li class="yes">5 secrets</li>
-          <li class="yes">Local vault (AES-256-GCM)</li>
-          <li class="yes">Sandbox / Unsandbox</li>
-          <li class="yes">MCP server (27 tools)</li>
-          <li class="yes">7 backends</li>
-          <li class="yes">TOTP / Sharing / Dead Man</li>
-          <li class="no">Team vaults</li>
-          <li class="no">Audit log</li>
-          <li class="no">Secret rotation</li>
-          <li class="no">CI/CD integration</li>
+          <li class="yes">Up to 5 secrets</li>
+          <li class="yes">Local AES-256-GCM vault</li>
+          <li class="yes">MCP server</li>
+          <li class="yes">Browser extension</li>
+          <li class="yes">Sandbox mode</li>
+          <li class="yes">Works with all supported editors</li>
         </ul>
-        <a href="https://github.com/aarifmms/keyblind" class="btn btn-outline" style="display:block;text-align:center;margin-left:0">Get Started</a>
+        <a href="#getting-started" class="btn btn-outline">Start Free</a>
       </div>
-
-      <!-- Pro -->
       <div class="card featured">
         <h3>Pro</h3>
         <div class="price">$79</div>
         <div class="period">/ year</div>
         <ul>
           <li class="yes">Unlimited secrets</li>
-          <li class="yes">Local vault (AES-256-GCM)</li>
-          <li class="yes">Sandbox / Unsandbox</li>
-          <li class="yes">MCP server (27 tools)</li>
-          <li class="yes">7 backends</li>
-          <li class="yes">TOTP / Sharing / Dead Man</li>
           <li class="yes">Team vaults</li>
           <li class="yes">Audit log</li>
-          <li class="yes">Secret rotation</li>
-          <li class="yes">CI/CD integration</li>
+          <li class="yes">Encrypted secret sharing</li>
+          <li class="yes">Dead man's switch</li>
+          <li class="yes">Built-in TOTP / 2FA</li>
+          <li class="yes">Priority support</li>
+          <li class="yes">Everything in Free</li>
         </ul>
-        <a href="https://buy.stripe.com/dRm9AMgFGgkS0Pj4f92cg00" class="btn btn-primary" style="display:block;text-align:center;margin-left:0">Buy Pro $79/year</a>
+        <a href="https://buy.stripe.com/dRm9AMgFGgkS0Pj4f92cg00" class="btn btn-primary">Get Pro</a>
       </div>
-
-      <!-- Team -->
       <div class="card">
         <h3>Team</h3>
         <div class="price">$15</div>
@@ -300,150 +422,139 @@
           <li class="yes">Short-lived agent tokens</li>
           <li class="yes">Audit export</li>
         </ul>
-        <a href="https://app.keyblind.dev" class="btn btn-outline" style="display:block;text-align:center;margin-left:0">Start Team</a>
+        <a href="https://app.keyblind.dev" class="btn btn-outline">Start Team</a>
       </div>
     </div>
-  </div>
+    <p class="pricing-note">Pro: one-time yearly payment. Team: billed monthly per user. Cancel anytime.</p>
 
-  <!-- Comparison -->
-  <div class="section">
-    <h2>Keyblind vs Cloak</h2>
-    <div class="sub">Why Keyblind is the right choice for AI-era secret management.</div>
-    <div style="overflow-x:auto;">
-      <table class="compare">
+    <div class="table-wrap">
+      <table>
         <thead>
-          <tr>
-            <th>Feature</th>
-            <th>Keyblind</th>
-            <th>Cloak</th>
-          </tr>
+          <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Protocol</td>
-            <td class="win">MCP (every AI tool)</td>
-            <td class="lose">VS Code / Cursor only</td>
-          </tr>
-          <tr>
-            <td>Editors supported</td>
-            <td class="win">6 (Claude Code, Cursor, Copilot, Windsurf, Cline, Zed)</td>
-            <td class="lose">2 (VS Code, Cursor)</td>
-          </tr>
-          <tr>
-            <td>Encryption</td>
-            <td class="win">AES-256-GCM + machine-identity-bound key</td>
-            <td class="lose">AES-256-GCM</td>
-          </tr>
-          <tr>
-            <td>Backends</td>
-            <td class="win">7 (local, 1Password, Bitwarden, AWS, GCP, Azure, env)</td>
-            <td class="lose">1 (local)</td>
-          </tr>
-          <tr>
-            <td>Sandbox</td>
-            <td class="win">Deterministic HMAC-SHA256 fakes</td>
-            <td class="lose">Random placeholders</td>
-          </tr>
-          <tr>
-            <td>TOTP / 2FA built-in</td>
-            <td class="win">Yes</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>Secret sharing</td>
-            <td class="win">Encrypted URL fragments</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>Dead man's switch</td>
-            <td class="win">Yes</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>Team vaults</td>
-            <td class="win">Git-safe, passphrase-protected</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>Dashboard</td>
-            <td class="win">Local web dashboard</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>Browser extension</td>
-            <td class="win">Chrome (paste interception)</td>
-            <td class="lose">No</td>
-          </tr>
-          <tr>
-            <td>License</td>
-            <td>MIT (open source)</td>
-            <td>Proprietary</td>
-          </tr>
-          <tr>
-            <td>Pricing</td>
-            <td class="win">Free tier + $79/yr Pro</td>
-            <td class="lose">$8/mo ($96/yr)</td>
-          </tr>
+          <tr><td>Secrets</td><td class="no">5</td><td class="yes">Unlimited</td></tr>
+          <tr><td>Local Vault</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>MCP Server</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Browser Extension</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Sandbox Mode</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Team Vaults</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Audit Log</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Secret Sharing</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Dead Man's Switch</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>TOTP / 2FA</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Priority Support</td><td class="no">No</td><td class="yes">Yes</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Docs -->
-  <div class="section" id="docs">
-    <h2>Documentation</h2>
-    <div class="sub">Everything you need to get started and go deep.</div>
-    <div style="display:grid;grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/getting-started.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">Getting Started</h4>
-        <p style="color:#8b949e;font-size:13px;">Install, init, first secret, sandbox walkthrough.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/commands.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">CLI Reference</h4>
-        <p style="color:#8b949e;font-size:13px;">All 40+ commands with examples and flags.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/mcp-integration.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">MCP Integration</h4>
-        <p style="color:#8b949e;font-size:13px;">27 MCP tools with parameter schemas and usage patterns.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/editors.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">Editor Setup</h4>
-        <p style="color:#8b949e;font-size:13px;">Per-editor config for Claude Code, Cursor, Copilot, and more.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/security.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">Security</h4>
-        <p style="color:#8b949e;font-size:13px;">Threat model, cryptographic architecture, attack surface analysis.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/recipes.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">Recipes</h4>
-        <p style="color:#8b949e;font-size:13px;">CI/CD, Docker, pre-commit, sharing, TOTP, multi-machine sync.</p>
-      </a>
-      <a href="https://github.com/aarifmms/keyblind/blob/main/docs/faq.md" class="card" style="text-decoration:none;display:block;">
-        <h4 style="color:#58a6ff;margin-bottom:4px;">FAQ</h4>
-        <p style="color:#8b949e;font-size:13px;">Common questions about setup, security, licensing, and teams.</p>
-      </a>
+  <!-- ── Getting started ── -->
+  <div class="section getting" id="getting-started">
+    <h2>Get started in under 2 minutes</h2>
+    <div class="sub">One command, every editor, free.</div>
+    <div class="gs-steps">
+      <div class="gs-step">
+        <div class="n">STEP 1</div>
+        <h3>Install Keyblind</h3>
+        <pre>npm install -g keyblind</pre>
+      </div>
+      <div class="gs-step">
+        <div class="n">STEP 2</div>
+        <h3>Run quickstart</h3>
+        <pre>keyblind quickstart</pre>
+      </div>
+      <div class="gs-step">
+        <div class="n">STEP 3</div>
+        <h3>Add your first secret</h3>
+        <pre>echo "your-key" | keyblind set OPENAI_API_KEY</pre>
+      </div>
+      <div class="gs-step">
+        <div class="n">STEP 4</div>
+        <h3>Use your AI tools normally</h3>
+        <p>Secrets are resolved automatically when needed.</p>
+      </div>
     </div>
   </div>
 
-</div>
+  <!-- ── FAQ ── -->
+  <div class="section" id="faq">
+    <h2>Frequently asked questions</h2>
+    <div class="sub">Everything you need to know before you install.</div>
+    <div class="faq">
+      <details>
+        <summary>Is Keyblind really local?</summary>
+        <p>Yes. The vault runs entirely on your machine. There is no cloud dependency for core functionality and zero telemetry.</p>
+      </details>
+      <details>
+        <summary>Which AI tools are supported?</summary>
+        <p>Claude Code, Cursor, Copilot, Windsurf, Cline, and Zed. Any tool that supports MCP.</p>
+      </details>
+      <details>
+        <summary>Is the free plan limited?</summary>
+        <p>You get full core functionality with up to 5 secrets. Most individual developers can use Free productively.</p>
+      </details>
+      <details>
+        <summary>What happens if I lose my machine?</summary>
+        <p>Pro includes recovery options through secret sharing and the Dead Man's Switch.</p>
+      </details>
+      <details>
+        <summary>Is it open source?</summary>
+        <p>Yes. Keyblind is released under the MIT license.</p>
+      </details>
+    </div>
+  </div>
 
-  <!-- Testimonials -->
-  <div class="container" style="margin-top:64px">
-    <h2 style="text-align:center;margin-bottom:32px">Trusted by Developers</h2>
-    <div class="testimonials">
-      <div class="card" style="text-align:center">
-        <p style="font-size:15px;color:#c9d1d9;line-height:1.6;font-style:italic">"Finally: an MCP-native secrets manager that actually works across all my editors. The sandbox feature alone saved me from leaking keys to Claude Code twice."</p>
-        <p style="margin-top:12px;font-size:14px;color:#8b949e">Alex R., Senior Engineer</p>
+  <!-- ── Compare ── -->
+  <div class="section" id="compare">
+    <h2>How Keyblind compares</h2>
+    <div class="sub">Built specifically for the AI coding era, not adapted from old password managers.</div>
+    <div class="compare-wrap">
+      <div class="table-wrap" style="margin-top:0">
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>Keyblind</th><th>Cloak</th><th>1Password</th><th>Bitwarden</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Built for AI Agents</td><td class="yes">Yes (MCP-native)</td><td class="partial">Limited</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Prevents secrets in LLM chats</td><td class="yes">Yes</td><td class="partial">Partial</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Runtime secret resolution</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Works with Claude Code / Cursor / Copilot / Windsurf / Cline / Zed</td><td class="yes">Yes</td><td class="partial">Limited</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Local-first / Offline</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="partial">Partial</td><td class="partial">Partial</td></tr>
+            <tr><td>Zero Telemetry</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Deterministic Sandbox</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Browser Extension (paste protection)</td><td class="yes">Yes</td><td class="no">No</td><td class="partial">Yes (general)</td><td class="partial">Yes (general)</td></tr>
+            <tr><td>Team Vaults</td><td class="yes">Yes (Pro)</td><td class="partial">Limited</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Dead Man's Switch</td><td class="yes">Yes (Pro)</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Open Source</td><td class="yes">Yes (MIT)</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Pricing</td><td class="yes">Free + $79/year</td><td class="no">Paid</td><td class="no">Subscription</td><td class="no">Free + Paid</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="card" style="text-align:center">
-        <p style="font-size:15px;color:#c9d1d9;line-height:1.6;font-style:italic">"We run Keyblind in CI to sandbox .env files before AI code review. Clean diffs, real secrets never exposed. It's part of our standard dev setup now."</p>
-        <p style="margin-top:12px;font-size:14px;color:#8b949e">Jordan M., DevOps Lead</p>
+
+      <div class="why">
+        <h3>Why Keyblind wins for AI developers</h3>
+        <ul>
+          <li><b>Purpose-built for AI agents</b> — not a general password manager trying to adapt.</li>
+          <li><b>MCP-native</b> — works cleanly with modern AI coding tools.</li>
+          <li><b>Runtime resolution</b> — secrets are used without ever appearing in the chat.</li>
+          <li><b>Sandbox mode</b> — safe for code reviews and CI pipelines.</li>
+          <li><b>True local-first</b> — no cloud dependency for core functionality.</li>
+        </ul>
       </div>
-      <div class="card" style="text-align:center">
-        <p style="font-size:15px;color:#c9d1d9;line-height:1.6;font-style:italic">"Switched from hand-managing .env files to Keyblind. The dead man's switch gives me peace of mind for our team vault access."</p>
-        <p style="margin-top:12px;font-size:14px;color:#8b949e">Sam T., CTO at 12-person startup</p>
+
+      <div class="bottomline">
+        <p>If you use AI coding tools daily, <b>Keyblind is the only solution designed specifically to stop your secrets from leaking into LLM conversations.</b></p>
+        <a href="#getting-started" class="btn btn-primary btn-lg">Install Keyblind Free</a>
       </div>
     </div>
+  </div>
+
+  <!-- ── Final CTA ── -->
+  <div class="final">
+    <h2>Protect your keys in under 2 minutes</h2>
+    <p>Encrypt your secrets once. Use them everywhere. Never leak them to AI.</p>
+    <a href="#getting-started" class="btn btn-primary btn-lg">Install Keyblind Free</a>
   </div>
 
 </div>
@@ -455,11 +566,19 @@
       <a href="https://www.npmjs.com/package/keyblind">npm</a>
       <a href="https://github.com/aarifmms/keyblind/tree/main/docs">Docs</a>
       <a href="https://app.keyblind.dev/dashboard">Dashboard</a>
+      <a href="https://chromewebstore.google.com/detail/keyblind-%E2%80%94-blind-ai-to-yo/ljobkicejnncijfmnkkedpgngbaalnmd">Chrome Web Store</a>
       <a href="/privacy.html">Privacy</a>
     </div>
     <p>MIT Licensed &middot; Zero network &middot; Zero telemetry &middot; Built for AI agents</p>
   </div>
 </footer>
+
+<script>
+  const burger = document.getElementById('navBurger');
+  const links = document.getElementById('navLinks');
+  burger.addEventListener('click', () => links.classList.toggle('open'));
+  links.querySelectorAll('a').forEach(a => a.addEventListener('click', () => links.classList.remove('open')));
+</script>
 
 </body>
 </html>
